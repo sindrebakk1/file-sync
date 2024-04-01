@@ -3,13 +3,13 @@ package filestatus
 type FileStatus int
 
 const (
-	Stale FileStatus = iota
-	Updated
-	Synced
+	Synced FileStatus = iota
+	New
+	Dirty
 	Syncing
 	Error
 )
 
 func (c FileStatus) String() string {
-	return [...]string{"Unknown", "Error", "Syncing", "Synced"}[c]
+	return [...]string{"Synced", "None", "New", "Dirty", "Syncing", "Error"}[c]
 }

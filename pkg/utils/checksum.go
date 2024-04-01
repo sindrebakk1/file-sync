@@ -3,7 +3,7 @@ package utils
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 )
@@ -11,7 +11,7 @@ import (
 func CalculateSHA256Checksum(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Debug("Error from os.Open", path)
 		return "", err
 	}
 	defer file.Close()
@@ -20,7 +20,7 @@ func CalculateSHA256Checksum(path string) (string, error) {
 
 	_, err = io.Copy(hasher, file)
 	if err != nil {
-		fmt.Println("Error", err)
+		log.Debug("Error from io.Copy", file.Name())
 		return "", err
 	}
 	checksum := hex.EncodeToString(hasher.Sum(nil))
