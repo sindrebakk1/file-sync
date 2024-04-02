@@ -6,7 +6,7 @@ import (
 )
 
 func TestCalculateSHA256Checksum(t *testing.T) {
-	var testFilePath = "../test/data/checksum/test_file.txt"
+	var testFilePath = "../../test/data/checksum/test_file.txt"
 	assert.FileExistsf(t, testFilePath, "test file exists")
 
 	var checksum, err = CalculateSHA256Checksum(testFilePath)

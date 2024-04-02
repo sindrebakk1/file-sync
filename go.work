@@ -4,4 +4,5 @@ use (
 	.
 	cmd/client
 	cmd/server
+	cmd/cli
 )
