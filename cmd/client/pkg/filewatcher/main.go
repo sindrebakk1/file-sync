@@ -1,6 +1,7 @@
 package filewatcher
 
 import (
+	"client/pkg/filesyncer"
 	"file-sync/pkg/enums"
 	"file-sync/pkg/models"
 	"file-sync/pkg/utils"
@@ -24,11 +25,12 @@ type FileWatcher interface {
 }
 
 // EventHandler is a function that handles file events.
-type EventHandler func(string, *models.FileInfo)
+type EventHandler func(string, *models.FileInfo, filesyncer.FileSyncer)
 
 // concreteFileWatcher implements the FileWatcher interface.
 type concreteFileWatcher struct {
 	watcher          *fsnotify.Watcher
+	syncer           filesyncer.FileSyncer
 	mutexes          sync.Map
 	fileMap          map[string]*models.FileInfo
 	dirMap           map[string]*models.DirInfo
@@ -36,13 +38,15 @@ type concreteFileWatcher struct {
 }
 
 // NewFileWatcher creates a new instance of FileWatcher.
-func NewFileWatcher(fileMap map[string]*models.FileInfo) (FileWatcher, error) {
+func NewFileWatcher(syncer filesyncer.FileSyncer) (FileWatcher, error) {
+	fileMap := syncer.GetSyncedFileMap()
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 	return &concreteFileWatcher{
 		watcher,
+		syncer,
 		sync.Map{},
 		fileMap,
 		make(map[string]*models.DirInfo),
@@ -226,7 +230,7 @@ func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *models.File
 		fileInfo.Status = enums.Dirty
 		fileInfo.Checksum = checksum
 		w.SetFileInfo(filePath, fileInfo)
-		handler(filePath, fileInfo)
+		handler(filePath, fileInfo, w.syncer)
 	} else {
 		log.Debug("No testFile1 modification detected: ", filePath, " status: ", fileInfo.Status, " Checksum: ", fileInfo.Checksum, " new Checksum: ", checksum)
 	}

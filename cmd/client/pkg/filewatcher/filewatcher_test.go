@@ -1,20 +1,23 @@
 package filewatcher
 
 import (
+	"client/pkg/_mocks"
+	"file-sync/pkg/enums"
 	"file-sync/pkg/models"
 	"file-sync/pkg/utils"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 )
 
 var (
-	baseDir       = "../test/data/filewatcher"
+	baseDir       = "./test"
+	backupsDir    = baseDir + "/backups"
 	testDir       = baseDir + "/test_dir"
 	watcher       FileWatcher
-	fileMap       = make(map[string]*models.FileInfo)
 	testFiles     = make(map[string]*os.File)
 	testFilePaths = []string{
 		path.Join(testDir, "test_file1.txt"),
@@ -25,34 +28,12 @@ var (
 	}
 )
 
-func TestMain(m *testing.M) {
-	// setup
-	setupTestDir()
-
-	exitCode := m.Run()
-
-	// teardown
-	if watcher != nil {
-		err := watcher.Close()
-		if err != nil {
-			fmt.Println("Error: ", err)
-			os.Exit(1)
-		}
-	}
-	teardownTestDir()
-
-	os.Exit(exitCode)
-}
-
 func TestSetup(t *testing.T) {
-	if watcher != nil {
-		fileWatcher := watcher
-		err := fileWatcher.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	fileWatcher, err := NewFileWatcher(fileMap)
+	setupTestDir()
+	createTestFiles()
+	fileInfoMap := makeFileInfoMap()
+	syncer := _mocks.NewMockFileSyncer(fileInfoMap)
+	fileWatcher, err := NewFileWatcher(syncer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +42,10 @@ func TestSetup(t *testing.T) {
 
 func TestTeardown(t *testing.T) {
 	if watcher != nil {
-		fileWatcher := watcher
-		err := fileWatcher.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		watcher.Close()
+		watcher = nil
 	}
+	tearDownTestDir()
 }
 
 func setupTestDir() {
@@ -76,7 +55,7 @@ func setupTestDir() {
 	}
 }
 
-func teardownTestDir() {
+func tearDownTestDir() {
 	for _, testFile := range testFiles {
 		err := testFile.Close()
 		if err != nil {
@@ -91,36 +70,51 @@ func teardownTestDir() {
 }
 
 func createTestFiles() {
-	for _, fileName := range testFilePaths {
-		filePath, file := createTestFile(fileName)
+	for _, testFilePath := range testFilePaths {
+		filePath, file := createTestFile(testFilePath)
 		testFiles[filePath] = file
 	}
 }
 
-func createTestFile(fileName string) (filePath string, file *os.File) {
-	testFilePath := path.Join(testDir, fileName)
+func createTestFile(filePath string) (testFilePath string, file *os.File) {
 	var err error
-	testFilePath, err = utils.NormalizePath(testFilePath)
+	testFilePath, err = utils.NormalizePath(filePath)
 	if err != nil {
 		panic(err)
 	}
 
 	var testFile *os.File
-	testFile, err = os.Create(testFilePath)
+	testFile, err = os.OpenFile(testFilePath, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		// Check if the error is due to the directory not existing
+		if os.IsNotExist(err) {
+			// Create the directory and try opening the file again
+			if err = os.MkdirAll(filepath.Dir(testFilePath), 0755); err != nil {
+				panic(err)
+			}
+			testFile, err = os.OpenFile(testFilePath, os.O_CREATE|os.O_RDWR, 0666)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			panic(err)
+		}
+	}
+
+	var backupFilePath string
+	fileName := path.Base(filePath)
+	backupFilePath, err = utils.NormalizePath(path.Join(backupsDir, fileName+".bak"))
 	if err != nil {
 		panic(err)
 	}
 
-	var backupFilePath string
+	log.Debug()
 	var backupFile *os.File
-	backupFilePath, err = utils.NormalizePath(path.Join(baseDir, fileName+".bak"))
-	if err != nil {
-		panic(err)
-	}
 	backupFile, err = os.OpenFile(backupFilePath, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
 	}
+	defer backupFile.Close()
 
 	// Copy the contents of the backup testFile to the new testFile
 	_, err = io.Copy(testFile, backupFile)
@@ -128,10 +122,23 @@ func createTestFile(fileName string) (filePath string, file *os.File) {
 		panic(err)
 	}
 
-	err = backupFile.Close()
-	if err != nil {
-		panic(err)
-	}
-
 	return testFilePath, testFile
+}
+
+func makeFileInfoMap() (fileInfoMap map[string]*models.FileInfo) {
+	fileInfoMap = make(map[string]*models.FileInfo)
+	for filePath, testFile := range testFiles {
+		info, err := testFile.Stat()
+		if err != nil {
+			panic(err)
+		}
+		checksum, err := utils.CalculateSHA256Checksum(filePath)
+		fileInfo := &models.FileInfo{
+			FileInfo: info,
+			Status:   enums.Synced,
+			Checksum: checksum,
+		}
+		fileInfoMap[filePath] = fileInfo
+	}
+	return fileInfoMap
 }

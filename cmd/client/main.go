@@ -1,6 +1,7 @@
 package main
 
 import (
+	"client/pkg/filesyncer"
 	"client/pkg/filewatcher"
 	"file-sync/pkg/models"
 	"file-sync/pkg/utils"
@@ -19,23 +20,24 @@ var (
 )
 
 func main() {
-	fileMap := make(map[string]*models.FileInfo)
-	watcher, err := filewatcher.NewFileWatcher(fileMap)
+	syncer, err := filesyncer.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func(watcher filewatcher.FileWatcher) {
-		err = watcher.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(watcher)
+	defer syncer.Close()
+
+	watcher, err := filewatcher.NewFileWatcher(syncer)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
 
 	err = watcher.WatchDirectory(watchDir)
 	err = watcher.ListenForEvents(map[fsnotify.Op]filewatcher.EventHandler{
 		fsnotify.Write:  handleWrite,
 		fsnotify.Create: handleCreate,
 		fsnotify.Remove: handleRemove,
+		fsnotify.Rename: handleRename,
 	})
 
 	interrupt := make(chan os.Signal, 1)
@@ -44,16 +46,20 @@ func main() {
 	log.Info("Shutting down...")
 }
 
-func handleWrite(filePath string, fileInfo *models.FileInfo) {
-	log.Debug("Wrote to file:", filePath, "status:", fileInfo.Status)
+func handleWrite(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+	log.Debug("WRITE:", filePath, "status:", fileInfo.Status)
 }
 
-func handleCreate(filePath string, fileInfo *models.FileInfo) {
-	log.Debug("Wrote to file:", filePath, "status:", fileInfo.Status)
+func handleCreate(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+	log.Debug("CREATE:", filePath, "status:", fileInfo.Status)
 }
 
-func handleRemove(filePath string, fileInfo *models.FileInfo) {
-	log.Debug("Wrote to file:", filePath, "status:", fileInfo.Status)
+func handleRemove(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+	log.Debug("REMOVE:", filePath, "status:", fileInfo.Status)
+}
+
+func handleRename(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+	log.Debug("RENAME:", filePath, "status:", fileInfo.Status)
 }
 
 func init() {

@@ -8,7 +8,8 @@ import (
 // FileSyncer is an interface for watching files and directories.
 type FileSyncer interface {
 	SyncFile(filePath string, fileInfo *models.FileInfo) error
-	SyncedFileMap() map[string]*models.FileInfo
+	GetSyncedFileMap() map[string]*models.FileInfo
+	Close() error
 }
 
 // EventHandler is a function that handles file events.
@@ -27,12 +28,17 @@ func New() (FileSyncer, error) {
 }
 
 // SyncFile queries the server and syncs the file.
-func (w *concreteFileSyncer) SyncFile(filePath string, fileInfo *models.FileInfo) error {
+func (w *concreteFileSyncer) SyncFile(filePath string, _ *models.FileInfo) error {
 	log.Debug("Syncing file:", filePath)
 	return nil
 }
 
-// SyncedFileMap returns the file map from the server.
-func (w *concreteFileSyncer) SyncedFileMap() map[string]*models.FileInfo {
+// GetSyncedFileMap returns the file map from the server.
+func (w *concreteFileSyncer) GetSyncedFileMap() map[string]*models.FileInfo {
 	return w.syncedFileMap
+}
+
+// Close closes the file syncer.
+func (w *concreteFileSyncer) Close() error {
+	return nil
 }
