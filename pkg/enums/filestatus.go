@@ -1,4 +1,4 @@
-package filestatus
+package enums
 
 type FileStatus int
 

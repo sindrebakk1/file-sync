@@ -1,7 +1,7 @@
 package models
 
 import (
-	filestatus "file-sync/pkg/enums"
+	"file-sync/pkg/enums"
 	"os"
 	"time"
 )
@@ -12,7 +12,7 @@ type FileInfo struct {
 	DebounceTime time.Time
 	LastUpdated  time.Time
 	Checksum     string
-	Status       filestatus.FileStatus
+	Status       enums.FileStatus
 }
 
 // DirInfo contains information about a directory.

@@ -3,13 +3,13 @@ package main
 import (
 	"client/pkg/filewatcher"
 	"file-sync/pkg/models"
+	"file-sync/pkg/utils"
 	"flag"
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"path"
-	"path/filepath"
 	"time"
 )
 
@@ -58,13 +58,13 @@ func handleRemove(filePath string, fileInfo *models.FileInfo) {
 
 func init() {
 	// Parse command line flags
-	flag.StringVar(&watchDir, "dir", ".", "directory to monitor")
+	flag.StringVar(&watchDir, "dir", "~/", "directory to monitor")
 	flag.Parse()
-	absPath, err := filepath.Abs(watchDir)
+	normalizedPath, err := utils.NormalizePath(watchDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-	watchDir = path.Clean(absPath)
+	watchDir = path.Clean(normalizedPath)
 
 	// Configure logging
 	log.SetLevel(log.DebugLevel)
@@ -72,5 +72,4 @@ func init() {
 		FullTimestamp: true,
 	})
 	log.SetReportCaller(true)
-	log.SetFormatter(&log.JSONFormatter{})
 }

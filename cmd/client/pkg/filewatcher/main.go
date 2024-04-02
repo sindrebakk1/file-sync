@@ -1,7 +1,7 @@
 package filewatcher
 
 import (
-	filestatus "file-sync/pkg/enums"
+	"file-sync/pkg/enums"
 	"file-sync/pkg/models"
 	"file-sync/pkg/utils"
 	"github.com/fsnotify/fsnotify"
@@ -23,7 +23,7 @@ type FileWatcher interface {
 	DeleteFileInfo(filePath string)
 }
 
-// EventHandler is a function that handles file events.
+// EventHandler is a function that handles testFile1 events.
 type EventHandler func(string, *models.FileInfo)
 
 // concreteFileWatcher implements the FileWatcher interface.
@@ -77,17 +77,17 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 					DebounceTime: time.Now(),
 					LastUpdated:  time.Now(),
 					Checksum:     checksum,
-					Status:       filestatus.New,
+					Status:       enums.New,
 				}
 				w.SetFileInfo(absPath, fileInfo)
 			}
 			if fileInfo.Checksum != checksum {
 				fileInfo.Checksum = checksum
 				fileInfo.DebounceTime = time.Now()
-				fileInfo.Status = filestatus.Dirty
+				fileInfo.Status = enums.Dirty
 				w.SetFileInfo(absPath, fileInfo)
 			}
-			// sync file
+			// sync testFile1
 
 			err = w.watcher.Add(absPath)
 			if err != nil {
@@ -113,7 +113,7 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 	return nil
 }
 
-// ListenForEvents listens for file changes.
+// ListenForEvents listens for testFile1 changes.
 func (w *concreteFileWatcher) ListenForEvents(eventMap map[fsnotify.Op]EventHandler) error {
 	go func() {
 		for {
@@ -149,14 +149,9 @@ func (w *concreteFileWatcher) ListenForEvents(eventMap map[fsnotify.Op]EventHand
 	return nil
 }
 
-// Close closes the file watcher.
+// Close closes the testFile1 watcher.
 func (w *concreteFileWatcher) Close() error {
-	// Implement the logic for closing the file watcher.
 	err := w.watcher.Close()
-	if err != nil {
-		return err
-	}
-	err = w.watcher.Close()
 	if err != nil {
 		return err
 	}
@@ -179,52 +174,57 @@ func (w *concreteFileWatcher) DeleteFileInfo(filePath string) {
 	delete(w.fileMap, filePath)
 }
 
+// debounceEvent debounces events for a given testFile1 path.
+// If enough time has passed since the last event, it triggers the provided handler.
+//   - filePath: The path of the testFile1 to debounce events for.
+//   - handler: The event handler function to call.
 func (w *concreteFileWatcher) debounceEvent(filePath string, handler EventHandler) {
-	absPath, err := filepath.Abs(filePath)
+	normalizedPath, err := utils.NormalizePath(filePath)
 	if err != nil {
-		log.Error("Error getting absolute path for ", filePath, err)
+		log.Error("Error getting absolute filePath for ", normalizedPath, err)
 		return
 	}
-	absPath = filepath.Clean(absPath)
-	filePath = filepath.Clean(absPath)
 
-	// Lock the mutex for the file to prevent concurrent access
-	mutex, ok := w.mutexes.Load(filePath)
+	// Lock the mutex for the testFile1 to prevent concurrent access
+	mutex, ok := w.mutexes.Load(normalizedPath)
 	if !ok {
-		log.Error("Error loading mutex for file:", filePath, err)
+		log.Error("Error loading mutex for testFile1:", normalizedPath, err)
 		return
 	}
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
-	fileInfo, ok := w.GetFileInfo(filePath)
+	fileInfo, ok := w.GetFileInfo(normalizedPath)
 	if !ok {
-		log.Error("Error getting file info for new file: ", filePath)
+		log.Error("Error getting testFile1 info for new testFile1: ", normalizedPath)
 		return
 	}
 	if time.Since(fileInfo.DebounceTime) >= w.debounceDuration {
-		// Either the file is not in the debounce map or enough time has passed since the last event
+		// Either the testFile1 is not in the debounce map or enough time has passed since the last event
 		fileInfo.DebounceTime = time.Now()
-		w.SetFileInfo(filePath, fileInfo)
-		go w.handleEvent(filePath, fileInfo, handler)
+		w.SetFileInfo(normalizedPath, fileInfo)
+		go w.handleEvent(normalizedPath, fileInfo, handler)
 		return
 	}
 }
 
-// handleEvent update the file status and Checksum before calling the handler.
+// handleEvent update the testFile1 status and Checksum before calling the handler.
+//   - filePath: The path of the testFile1 to handle.
+//   - fileInfo: The testFile1 info to update.
+//   - handler: The event handler function to call.
 func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *models.FileInfo, handler EventHandler) {
 	checksum, err := utils.CalculateSHA256Checksum(filePath)
 	if err != nil {
-		log.Error("Error calculating Checksum of file: ", filePath, err)
+		log.Error("Error calculating Checksum of testFile1: ", filePath, err)
 		return
 	}
 	if fileInfo.Checksum != checksum {
 		log.Debug("File modification detected: ", filePath, " status: ", fileInfo.Status, " Checksum: ", fileInfo.Checksum, " new Checksum: ", checksum)
-		fileInfo.Status = filestatus.Dirty
+		fileInfo.Status = enums.Dirty
 		fileInfo.Checksum = checksum
 		w.SetFileInfo(filePath, fileInfo)
 		handler(filePath, fileInfo)
 	} else {
-		log.Debug("No file modification detected: ", filePath, " status: ", fileInfo.Status, " Checksum: ", fileInfo.Checksum, " new Checksum: ", checksum)
+		log.Debug("No testFile1 modification detected: ", filePath, " status: ", fileInfo.Status, " Checksum: ", fileInfo.Checksum, " new Checksum: ", checksum)
 	}
 }
