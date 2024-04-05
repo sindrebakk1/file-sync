@@ -3,7 +3,7 @@ package main
 import (
 	"client/pkg/filesyncer"
 	"client/pkg/filewatcher"
-	"file-sync/pkg/models"
+	"file-sync/pkg/globalmodels"
 	"file-sync/pkg/utils"
 	"flag"
 	"github.com/fsnotify/fsnotify"
@@ -46,19 +46,19 @@ func main() {
 	log.Info("Shutting down...")
 }
 
-func handleWrite(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+func handleWrite(filePath string, fileInfo *globalmodels.FileInfo, _ filesyncer.FileSyncer) {
 	log.Debug("WRITE:", filePath, "status:", fileInfo.Status)
 }
 
-func handleCreate(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+func handleCreate(filePath string, fileInfo *globalmodels.FileInfo, _ filesyncer.FileSyncer) {
 	log.Debug("CREATE:", filePath, "status:", fileInfo.Status)
 }
 
-func handleRemove(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+func handleRemove(filePath string, fileInfo *globalmodels.FileInfo, _ filesyncer.FileSyncer) {
 	log.Debug("REMOVE:", filePath, "status:", fileInfo.Status)
 }
 
-func handleRename(filePath string, fileInfo *models.FileInfo, _ filesyncer.FileSyncer) {
+func handleRename(filePath string, fileInfo *globalmodels.FileInfo, _ filesyncer.FileSyncer) {
 	log.Debug("RENAME:", filePath, "status:", fileInfo.Status)
 }
 

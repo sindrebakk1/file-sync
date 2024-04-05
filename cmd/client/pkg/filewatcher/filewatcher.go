@@ -2,8 +2,8 @@ package filewatcher
 
 import (
 	"client/pkg/filesyncer"
-	"file-sync/pkg/enums"
-	"file-sync/pkg/models"
+	"file-sync/pkg/globalenums"
+	"file-sync/pkg/globalmodels"
 	"file-sync/pkg/utils"
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
@@ -19,21 +19,21 @@ type FileWatcher interface {
 	WatchDirectory(watchDir string) error
 	ListenForEvents(eventMap map[fsnotify.Op]EventHandler) error
 	Close() error
-	GetFileInfo(filePath string) (*models.FileInfo, bool)
-	SetFileInfo(filePath string, fileInfo *models.FileInfo)
+	GetFileInfo(filePath string) (*globalmodels.FileInfo, bool)
+	SetFileInfo(filePath string, fileInfo *globalmodels.FileInfo)
 	DeleteFileInfo(filePath string)
 }
 
 // EventHandler is a function that handles file events.
-type EventHandler func(string, *models.FileInfo, filesyncer.FileSyncer)
+type EventHandler func(string, *globalmodels.FileInfo, filesyncer.FileSyncer)
 
 // concreteFileWatcher implements the FileWatcher interface.
 type concreteFileWatcher struct {
 	watcher          *fsnotify.Watcher
 	syncer           filesyncer.FileSyncer
 	mutexes          sync.Map
-	fileMap          map[string]*models.FileInfo
-	dirMap           map[string]*models.DirInfo
+	fileMap          map[string]*globalmodels.FileInfo
+	dirMap           map[string]*globalmodels.DirInfo
 	debounceDuration time.Duration
 }
 
@@ -49,7 +49,7 @@ func NewFileWatcher(syncer filesyncer.FileSyncer) (FileWatcher, error) {
 		syncer,
 		sync.Map{},
 		fileMap,
-		make(map[string]*models.DirInfo),
+		make(map[string]*globalmodels.DirInfo),
 		200 * time.Millisecond,
 	}, nil
 }
@@ -70,7 +70,7 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 
 		if info.IsDir() {
 			if _, exists := w.dirMap[absPath]; !exists {
-				w.dirMap[absPath] = &models.DirInfo{
+				w.dirMap[absPath] = &globalmodels.DirInfo{
 					FileInfo:     info,
 					DebounceTime: time.Now(),
 					LastUpdated:  time.Now(),
@@ -87,12 +87,12 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 
 		fileInfo, exists := w.GetFileInfo(absPath)
 		if !exists {
-			fileInfo = &models.FileInfo{
+			fileInfo = &globalmodels.FileInfo{
 				FileInfo:     info,
 				DebounceTime: time.Now(),
 				LastUpdated:  time.Now(),
 				Checksum:     checksum,
-				Status:       enums.New,
+				Status:       globalenums.Unknown,
 			}
 			w.SetFileInfo(absPath, fileInfo)
 		}
@@ -100,7 +100,7 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 		if fileInfo.Checksum != checksum {
 			fileInfo.Checksum = checksum
 			fileInfo.DebounceTime = time.Now()
-			fileInfo.Status = enums.Dirty
+			fileInfo.Status = globalenums.Dirty
 			w.SetFileInfo(absPath, fileInfo)
 			// sync file
 		}
@@ -165,7 +165,7 @@ func (w *concreteFileWatcher) Close() error {
 	return nil
 }
 
-func (w *concreteFileWatcher) GetFileInfo(filePath string) (*models.FileInfo, bool) {
+func (w *concreteFileWatcher) GetFileInfo(filePath string) (*globalmodels.FileInfo, bool) {
 	fileInfo, ok := w.fileMap[filePath]
 	if !ok {
 		return nil, false
@@ -173,7 +173,7 @@ func (w *concreteFileWatcher) GetFileInfo(filePath string) (*models.FileInfo, bo
 	return fileInfo, true
 }
 
-func (w *concreteFileWatcher) SetFileInfo(filePath string, fileInfo *models.FileInfo) {
+func (w *concreteFileWatcher) SetFileInfo(filePath string, fileInfo *globalmodels.FileInfo) {
 	w.fileMap[filePath] = fileInfo
 }
 
@@ -219,7 +219,7 @@ func (w *concreteFileWatcher) debounceEvent(filePath string, handler EventHandle
 //   - filePath: The path of the testFile1 to handle.
 //   - fileInfo: The file info to update.
 //   - handler: The event handler function to call.
-func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *models.FileInfo, handler EventHandler) {
+func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *globalmodels.FileInfo, handler EventHandler) {
 	checksum, err := utils.CalculateSHA256Checksum(filePath)
 	if err != nil {
 		log.Error("Error calculating Checksum of testFile1: ", filePath, err)
@@ -227,7 +227,7 @@ func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *models.File
 	}
 	if fileInfo.Checksum != checksum {
 		log.Debug("File modification detected: ", filePath, " status: ", fileInfo.Status, " Checksum: ", fileInfo.Checksum, " new Checksum: ", checksum)
-		fileInfo.Status = enums.Dirty
+		fileInfo.Status = globalenums.Dirty
 		fileInfo.Checksum = checksum
 		w.SetFileInfo(filePath, fileInfo)
 		handler(filePath, fileInfo, w.syncer)

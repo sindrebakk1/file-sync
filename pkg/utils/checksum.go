@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -16,7 +16,7 @@ func CalculateSHA256Checksum(path string) (string, error) {
 	}
 	defer file.Close()
 
-	hasher := sha1.New()
+	hasher := sha256.New()
 
 	_, err = io.Copy(hasher, file)
 	if err != nil {

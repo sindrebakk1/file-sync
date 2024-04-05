@@ -2,8 +2,6 @@ package filewatcher
 
 import (
 	"client/pkg/_mocks"
-	"file-sync/pkg/enums"
-	"file-sync/pkg/models"
 	"file-sync/pkg/utils"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -27,6 +25,18 @@ var (
 		path.Join(testDir, "test_sub_dir", "test_file5.txt"),
 	}
 )
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+
+	// clean up in case of a panic in TestSetup or TestTeardown
+	if watcher != nil {
+		watcher.Close()
+		watcher = nil
+	}
+	tearDownTestDir()
+	os.Exit(code)
+}
 
 func TestSetup(t *testing.T) {
 	setupTestDir()
@@ -125,17 +135,17 @@ func createTestFile(filePath string) (testFilePath string, file *os.File) {
 	return testFilePath, testFile
 }
 
-func makeFileInfoMap() (fileInfoMap map[string]*models.FileInfo) {
-	fileInfoMap = make(map[string]*models.FileInfo)
+func makeFileInfoMap() (fileInfoMap map[string]*globalmodels.FileInfo) {
+	fileInfoMap = make(map[string]*globalmodels.FileInfo)
 	for filePath, testFile := range testFiles {
 		info, err := testFile.Stat()
 		if err != nil {
 			panic(err)
 		}
 		checksum, err := utils.CalculateSHA256Checksum(filePath)
-		fileInfo := &models.FileInfo{
+		fileInfo := &globalmodels.FileInfo{
 			FileInfo: info,
-			Status:   enums.Synced,
+			Status:   globalenums.Synced,
 			Checksum: checksum,
 		}
 		fileInfoMap[filePath] = fileInfo

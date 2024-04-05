@@ -2,24 +2,24 @@ package _mocks
 
 import (
 	"client/pkg/filesyncer"
-	"file-sync/pkg/models"
+	"file-sync/pkg/globalmodels"
 )
 
 type mockFileSyncer struct {
-	syncedFileMap map[string]*models.FileInfo
+	syncedFileMap map[string]*globalmodels.FileInfo
 }
 
-func NewMockFileSyncer(syncedFileMap map[string]*models.FileInfo) filesyncer.FileSyncer {
+func NewMockFileSyncer(syncedFileMap map[string]*globalmodels.FileInfo) filesyncer.FileSyncer {
 	return &mockFileSyncer{
 		syncedFileMap,
 	}
 }
 
-func (m *mockFileSyncer) SyncFile(_ string, _ *models.FileInfo) error {
+func (m *mockFileSyncer) SyncFile(_ string, _ *globalmodels.FileInfo) error {
 	return nil
 }
 
-func (m *mockFileSyncer) GetSyncedFileMap() map[string]*models.FileInfo {
+func (m *mockFileSyncer) GetSyncedFileMap() map[string]*globalmodels.FileInfo {
 	return m.syncedFileMap
 }
 
