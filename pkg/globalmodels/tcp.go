@@ -1,41 +1,74 @@
 package globalmodels
 
-type StatusCode int
+import "file-sync/pkg/globalenums"
 
-const (
-	OK             StatusCode = 200
-	InvalidMessage            = 400
-	InternalError             = 500
-)
-
+// Message is the base struct for all messages.
 type Message struct {
-	StatusCode StatusCode
+	MessageType globalenums.MessageType
+	Payload     interface{}
 }
 
-// HandshakeMessage contains information about a handshake message.
-type HandshakeMessage struct {
+// ChallengeMessage contains a challenge for the client.
+type ChallengeMessage struct {
 	Message
-	ClientID  string
-	ServerID  string
-	SharedKey []byte
+	Payload []byte
 }
 
-// HandshakeResponseMessage contains information about a handshake response message.
-type HandshakeResponseMessage struct {
-	Message
-	ClientID string
-	ServerID string
+// ChallengeResponse is the payload for a ChallengeResponseMessage.
+type ChallengeResponse struct {
+	Response []byte
+	User     string
 }
 
-// FileInfoMessage contains information about a file message.
-type FileInfoMessage struct {
+// ChallengeResponseMessage contains information about a challenge response message.
+type ChallengeResponseMessage struct {
 	Message
-	Hash     string
-	FileInfo FileInfo
+	Payload ChallengeResponse
+}
+
+// AuthResponseMessage contains information about an authentication response message.
+type AuthResponseMessage struct {
+	Message
+	Payload globalenums.AuthResult
+}
+
+// NewUserResponseMessage contains a shared key for a new user.
+type NewUserResponseMessage struct {
+	Message
+	Payload []byte
+}
+
+// SyncRequest is the payload for a SyncRequestMessage.
+type SyncRequest struct {
+	Hash string
+	Info File
+}
+
+// SyncRequestMessage contains information about a file message.
+type SyncRequestMessage struct {
+	Message
+	Payload SyncRequest
+}
+
+// SyncResponse is the payload for a SyncResponseMessage.
+type SyncResponse struct {
+	Info File
+}
+
+// SyncResponseMessage contains information about a file message.
+type SyncResponseMessage struct {
+	Message
+	Payload SyncResponse
 }
 
 // FileChunkMessage contains information about a file chunk message.
 type FileChunkMessage struct {
 	Message
-	chunk []byte
+	Payload []byte
+}
+
+// ErrorMessage contains information about an error message.
+type ErrorMessage struct {
+	Message
+	Payload string
 }

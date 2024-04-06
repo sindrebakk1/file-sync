@@ -19,20 +19,20 @@ type FileWatcher interface {
 	WatchDirectory(watchDir string) error
 	ListenForEvents(eventMap map[fsnotify.Op]EventHandler) error
 	Close() error
-	GetFileInfo(filePath string) (*globalmodels.FileInfo, bool)
-	SetFileInfo(filePath string, fileInfo *globalmodels.FileInfo)
+	GetFileInfo(filePath string) (*globalmodels.File, bool)
+	SetFileInfo(filePath string, fileInfo *globalmodels.File)
 	DeleteFileInfo(filePath string)
 }
 
 // EventHandler is a function that handles file events.
-type EventHandler func(string, *globalmodels.FileInfo, filesyncer.FileSyncer)
+type EventHandler func(string, *globalmodels.File, filesyncer.FileSyncer)
 
 // concreteFileWatcher implements the FileWatcher interface.
 type concreteFileWatcher struct {
 	watcher          *fsnotify.Watcher
 	syncer           filesyncer.FileSyncer
 	mutexes          sync.Map
-	fileMap          map[string]*globalmodels.FileInfo
+	fileMap          map[string]*globalmodels.File
 	dirMap           map[string]*globalmodels.DirInfo
 	debounceDuration time.Duration
 }
@@ -73,7 +73,6 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 				w.dirMap[absPath] = &globalmodels.DirInfo{
 					FileInfo:     info,
 					DebounceTime: time.Now(),
-					LastUpdated:  time.Now(),
 				}
 			}
 			return nil
@@ -87,10 +86,9 @@ func (w *concreteFileWatcher) WatchDirectory(watchDir string) error {
 
 		fileInfo, exists := w.GetFileInfo(absPath)
 		if !exists {
-			fileInfo = &globalmodels.FileInfo{
+			fileInfo = &globalmodels.File{
 				FileInfo:     info,
 				DebounceTime: time.Now(),
-				LastUpdated:  time.Now(),
 				Checksum:     checksum,
 				Status:       globalenums.Unknown,
 			}
@@ -165,7 +163,7 @@ func (w *concreteFileWatcher) Close() error {
 	return nil
 }
 
-func (w *concreteFileWatcher) GetFileInfo(filePath string) (*globalmodels.FileInfo, bool) {
+func (w *concreteFileWatcher) GetFileInfo(filePath string) (*globalmodels.File, bool) {
 	fileInfo, ok := w.fileMap[filePath]
 	if !ok {
 		return nil, false
@@ -173,7 +171,7 @@ func (w *concreteFileWatcher) GetFileInfo(filePath string) (*globalmodels.FileIn
 	return fileInfo, true
 }
 
-func (w *concreteFileWatcher) SetFileInfo(filePath string, fileInfo *globalmodels.FileInfo) {
+func (w *concreteFileWatcher) SetFileInfo(filePath string, fileInfo *globalmodels.File) {
 	w.fileMap[filePath] = fileInfo
 }
 
@@ -219,7 +217,7 @@ func (w *concreteFileWatcher) debounceEvent(filePath string, handler EventHandle
 //   - filePath: The path of the testFile1 to handle.
 //   - fileInfo: The file info to update.
 //   - handler: The event handler function to call.
-func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *globalmodels.FileInfo, handler EventHandler) {
+func (w *concreteFileWatcher) handleEvent(filePath string, fileInfo *globalmodels.File, handler EventHandler) {
 	checksum, err := utils.CalculateSHA256Checksum(filePath)
 	if err != nil {
 		log.Error("Error calculating Checksum of testFile1: ", filePath, err)

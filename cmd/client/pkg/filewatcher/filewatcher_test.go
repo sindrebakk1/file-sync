@@ -2,6 +2,8 @@ package filewatcher
 
 import (
 	"client/pkg/_mocks"
+	"file-sync/pkg/globalenums"
+	"file-sync/pkg/globalmodels"
 	"file-sync/pkg/utils"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -135,15 +137,15 @@ func createTestFile(filePath string) (testFilePath string, file *os.File) {
 	return testFilePath, testFile
 }
 
-func makeFileInfoMap() (fileInfoMap map[string]*globalmodels.FileInfo) {
-	fileInfoMap = make(map[string]*globalmodels.FileInfo)
+func makeFileInfoMap() (fileInfoMap map[string]*globalmodels.File) {
+	fileInfoMap = make(map[string]*globalmodels.File)
 	for filePath, testFile := range testFiles {
 		info, err := testFile.Stat()
 		if err != nil {
 			panic(err)
 		}
 		checksum, err := utils.CalculateSHA256Checksum(filePath)
-		fileInfo := &globalmodels.FileInfo{
+		fileInfo := &globalmodels.File{
 			FileInfo: info,
 			Status:   globalenums.Synced,
 			Checksum: checksum,

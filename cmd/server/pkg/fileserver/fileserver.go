@@ -3,9 +3,14 @@ package fileserver
 import (
 	"crypto/tls"
 	"encoding/gob"
+	"file-sync/pkg/globalenums"
 	"file-sync/pkg/globalmodels"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net"
+	"os"
+	"os/signal"
+	"server/pkg/auth"
 	"server/pkg/cache"
 	"server/services"
 )
@@ -15,18 +20,26 @@ type FileServer interface {
 }
 
 type concreteFileServer struct {
+	userService services.UserService
 	fileCache   cache.Cache
 	metaCache   cache.Cache
-	fileService services.FileService
-	config      *tls.Config
+	tlsConfig   *tls.Config
+	authConfig  *auth.Config
 }
 
-func NewFileServer(fileService services.FileService, fileCache cache.Cache, metaCache cache.Cache, config *tls.Config) (FileServer, error) {
+func NewFileServer(
+	userService services.UserService,
+	fileCache cache.Cache,
+	metaCache cache.Cache,
+	tlsConfig *tls.Config,
+	authConfig *auth.Config,
+) (FileServer, error) {
 	return &concreteFileServer{
+		userService,
 		fileCache,
 		metaCache,
-		fileService,
-		config,
+		tlsConfig,
+		authConfig,
 	}, nil
 }
 
@@ -37,7 +50,7 @@ func (s *concreteFileServer) ListenAndServe(port int) error {
 	}
 	defer listener.Close()
 
-	tlsListener := tls.NewListener(listener, s.config)
+	tlsListener := tls.NewListener(listener, s.tlsConfig)
 	defer tlsListener.Close()
 
 	for {
@@ -52,24 +65,46 @@ func (s *concreteFileServer) ListenAndServe(port int) error {
 func (s *concreteFileServer) handleClient(conn net.Conn) {
 	defer conn.Close()
 
-	decoder := gob.NewDecoder(conn)
-	encoder := gob.NewEncoder(conn)
+	// Create a channel to receive interrupt signals
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
 
-	var handshakeMessage globalmodels.HandshakeMessage
-	// Handshake...
-	err := decoder.Decode(&handshakeMessage)
+	encoder := gob.NewEncoder(conn)
+	decoder := gob.NewDecoder(conn)
+
+	// 1. Authenticate client
+	authenticator := auth.NewAuthenticator(encoder, decoder, s.userService, s.authConfig)
+	userName, err := authenticator.AuthenticateClient()
 	if err != nil {
-		handleErrorResponse(encoder, globalmodels.InvalidMessage)
+		log.Error(err)
 		return
 	}
-	// Receive the client's request...
-	// Process the request...
-	// Send the response...
+	// 2. Initialize file service based on user
+	//var fileService services.FileService
+	_, err = s.userService.GetFileService(userName)
+	// 3. Handle requests until interrupt signal is sent
+	for {
+		var request globalmodels.Message
+		err = decoder.Decode(&request)
+		if err != nil {
+			log.Error("Error decoding request: ", err)
+			return
+		}
 
-	// After the handshake, continue with regular communication...
+		fmt.Printf("Received request: %v\n", request)
+
+		// Check for interrupt signal
+		select {
+		case <-interrupt:
+			fmt.Println("Received interrupt signal. Shutting down gracefully.")
+			return
+		default:
+			// Continue handling client requests
+		}
+	}
 }
 
-func handleErrorResponse(encoder *gob.Encoder, statusCode globalmodels.StatusCode) {
+func handleErrorResponse(encoder *gob.Encoder, statusCode globalenums.StatusCode) {
 	encoder.Encode(globalmodels.Message{
 		StatusCode: statusCode,
 	})

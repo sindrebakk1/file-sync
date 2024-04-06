@@ -9,11 +9,12 @@ import (
 	"server/models"
 	"server/pkg/fileparser"
 	"sync"
+	"time"
 )
 
 type FileService interface {
 	// GetStatus returns the file with the given ID.
-	GetStatus(hash string, fileInfo *globalmodels.FileInfo) (status globalenums.FileStatus, err error)
+	GetStatus(hash string, fileInfo *globalmodels.File) (status globalenums.FileStatus, err error)
 	// UpdateStatus updates the status of the file with the given ID.
 	UpdateStatus(hash string, status globalenums.FileStatus) (err error)
 	// GetChecksum returns the checksum of the file with the given ID.
@@ -21,9 +22,9 @@ type FileService interface {
 	// UpdateChecksum updates the checksum of the file with the given ID.
 	UpdateChecksum(hash string, checksum string) (err error)
 	// GetLastUpdated returns the last updated time of the file with the given ID.
-	GetLastUpdated(hash string) (lastUpdated string, err error)
+	GetLastUpdated(hash string) (lastUpdated time.Time, err error)
 	// UpdateLastUpdated updates the last updated time of the file with the given ID.
-	UpdateLastUpdated(hash string, lastUpdated string) (err error)
+	UpdateLastUpdated(hash string, lastUpdated time.Time) (err error)
 	// GetUploadSession returns the upload session ID of the file with the given ID.
 	GetUploadSession(hash string) (sessionId string, err error)
 	// UploadChunk uploads a chunk of the file with the given session ID.
@@ -36,25 +37,43 @@ type FileService interface {
 	GetFileMap() map[string]*models.SyncedFile
 }
 
+type FileServiceFactory interface {
+	NewFileService(dir string) (FileService, error)
+}
+
+type concreteFileServiceFactory struct {
+	baseDir string
+}
+
+func NewFileServiceFactory(baseDir string) FileServiceFactory {
+	return &concreteFileServiceFactory{
+		baseDir,
+	}
+}
+
+func (f *concreteFileServiceFactory) NewFileService(dir string) (FileService, error) {
+	return newFileService(filepath.Join(f.baseDir, dir))
+}
+
 type concreteFileService struct {
-	baseDir       string
+	dir           string
 	syncedFileMap map[string]*models.SyncedFile
 	mutexes       *sync.Map
 }
 
-func NewFileService(baseDir string) (FileService, error) {
-	fileMap, mutexes, err := initFileMap(baseDir)
+func newFileService(dir string) (FileService, error) {
+	fileMap, mutexes, err := initFileMap(dir)
 	if err != nil {
 		return nil, err
 	}
 	return &concreteFileService{
-		baseDir,
+		dir,
 		fileMap,
 		mutexes,
 	}, nil
 }
 
-func (s *concreteFileService) GetStatus(hash string, fileInfo *globalmodels.FileInfo) (status globalenums.FileStatus, err error) {
+func (s *concreteFileService) GetStatus(hash string, fileInfo *globalmodels.File) (status globalenums.FileStatus, err error) {
 	return s.syncedFileMap[hash].Status, nil
 }
 
@@ -72,11 +91,11 @@ func (s *concreteFileService) UpdateChecksum(hash string, checksum string) (err 
 	return nil
 }
 
-func (s *concreteFileService) GetLastUpdated(hash string) (lastUpdated string, err error) {
-	return s.syncedFileMap[hash].LastUpdated.String(), nil
+func (s *concreteFileService) GetLastUpdated(hash string) (lastUpdated time.Time, err error) {
+	return s.syncedFileMap[hash].ModTime(), nil
 }
 
-func (s *concreteFileService) UpdateLastUpdated(hash string, lastUpdated string) (err error) {
+func (s *concreteFileService) UpdateLastUpdated(hash string, lastUpdated time.Time) (err error) {
 	return nil
 }
 
@@ -130,10 +149,9 @@ func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes
 
 		mutexes.Store(info.Name(), &sync.Mutex{})
 		fileMap[info.Name()] = &models.SyncedFile{
-			Hash:        info.Name(),
-			Checksum:    string(checksum),
-			Status:      globalenums.Unknown,
-			LastUpdated: info.ModTime(),
+			Hash:     info.Name(),
+			Checksum: string(checksum),
+			Status:   globalenums.Unknown,
 		}
 		return nil
 	})
