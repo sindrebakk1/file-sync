@@ -70,6 +70,10 @@ func main() {
 }
 
 func init() {
+	// Configure logging.
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetLevel(log.DebugLevel)
+
+	// Register gob types.
+	fileserver.RegisterGobTypes()
 }

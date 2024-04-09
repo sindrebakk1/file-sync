@@ -1,9 +1,6 @@
 package auth
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/gob"
 	"file-sync/pkg/globalenums"
 	"file-sync/pkg/globalmodels"
@@ -16,143 +13,176 @@ import (
 )
 
 const (
-	Port         = 8081
 	BaseDir      = "test"
-	ChallengeLen = 4
+	ChallengeLen = 32
+	Port         = 8081
 )
 
 var (
-	authenticator      Authenticator
-	listener           net.Listener
 	userService        services.UserService
 	authConfig         *Config
 	fileServiceFactory services.FileServiceFactory
-	conn               net.Conn
-	userName           string
+	listener           net.Listener
+
+	// Test users
+	testUser1   = "test1"
+	testSecret1 = []byte("secret1")
+	testUser2   = "test2"
+	testSecret2 = []byte("secret2")
 )
 
 func TestMain(m *testing.M) {
-	// Initialize services.
 	fileServiceFactory = services.NewFileServiceFactory(BaseDir)
 	userService = services.NewUserService(fileServiceFactory)
 	authConfig = &Config{
 		ChallengeLen: ChallengeLen,
 	}
-	os.Exit(m.Run())
-}
 
-func TestSetup(t *testing.T) {
-	var (
-		err error
-	)
-
-	listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", Port))
+	var err error
+	listener, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
 	if err != nil {
-		t.Fatalf("Failed to start listener: %v", err)
+		panic(err)
 	}
-	go func() {
-		for {
-			conn, err = listener.Accept()
-			if err != nil {
-				t.Errorf("Failed to accept connection: %v", err)
-				return
-			}
+	defer listener.Close()
 
-			encoder := gob.NewEncoder(conn)
-			decoder := gob.NewDecoder(conn)
-			authenticator = NewAuthenticator(encoder, decoder, userService, authConfig)
-			userName, err = authenticator.AuthenticateClient()
-			if err != nil {
-				t.Errorf("Failed to authenticate client: %v", err)
-				return
-			}
-			t.Logf("Authenticated client: %s", userName)
-
-			conn.Close()
-		}
-	}()
-}
-
-func TestTeardown(t *testing.T) {
-	listener.Close()
-	authenticator = nil
+	os.Exit(m.Run())
 }
 
 // TestAuthenticateClientNewUser tests the authentication of a new user.
 func TestAuthenticateClientNewUser(t *testing.T) {
-	var (
-		err           error
-		testUser      = "test"
-		testSharedKey = []byte("testsecret")
-	)
-	conn, err = net.Dial("tcp", fmt.Sprintf("localhost:%d", Port))
-	if err != nil {
-		t.Fatalf("Failed to dial connection: %v", err)
-	}
-	encoder := gob.NewEncoder(conn)
-	decoder := gob.NewDecoder(conn)
+	go testClient(t, testUser1, testSecret1)
 
-	// Receive the challenge from the server.
-	var challengeMessage globalmodels.ChallengeMessage
-	err = decoder.Decode(&challengeMessage)
-	if err != nil {
-		t.Fatalf("Failed to receive challenge: %v", err)
-	}
+	conn, err := listener.Accept()
+	assert.NoError(t, err)
+	defer conn.Close()
 
-	// Calculate the response to the challenge.
-	response := make([]byte, base64.StdEncoding.EncodedLen(sha256.Size))
-	response, err = calculateChallengeResponse(challengeMessage.Payload, testSharedKey)
-	if err != nil {
-		t.Fatalf("Failed to calculate challenge response: %v", err)
-	}
+	authenticator := NewAuthenticator(conn, userService, authConfig)
 
-	// Respond to the challenge.
-	challengeResponseMessage := globalmodels.ChallengeResponseMessage{
-		Message: globalmodels.Message{
-			MessageType: globalenums.Authentication,
-		},
-		Payload: globalmodels.ChallengeResponse{
-			User:     testUser,
-			Response: response,
-		},
-	}
-	err = encoder.Encode(&challengeResponseMessage)
-	if err != nil {
-		t.Fatalf("Failed to send challenge response: %v", err)
-	}
+	var userName string
+	userName, err = authenticator.AuthenticateClient()
+	assert.NoError(t, err, "Error authenticating client")
+	assert.Equal(t, testUser1, userName, "Expected user name to be %s, got %s", testUser1, userName)
 
-	// Receive the authentication result from the server.
-	var authResponseMessage globalmodels.AuthResponseMessage
-	err = decoder.Decode(&authResponseMessage)
-	if err != nil {
-		t.Fatalf("Failed to receive authentication result: %v", err)
-	}
-
-	assert.Equal(t, globalenums.NewUser, authResponseMessage.Payload, "Expected new user to be created")
-
-	err = encoder.Encode(&testSharedKey)
-
-	err = decoder.Decode(&authResponseMessage)
-
-	assert.Equal(t, globalenums.Authenticated, authResponseMessage.Payload, "Expected OK status")
-	assert.Equal(t, testUser, userName, "Expected user name to be set correctly")
-
-	conn.Close()
+	t.Logf("Server: Authenticated user: %s\n", userName)
 }
 
-func calculateChallengeResponse(challenge []byte, sharedKey []byte) (response []byte, err error) {
-	challengeBytes := make([]byte, base64.StdEncoding.DecodedLen(len(challenge)))
-	_, err = base64.StdEncoding.Decode(challengeBytes, challenge)
-	if err != nil {
-		return nil, err
-	}
+// TestAuthenticateClientExistingUser tests the authentication of an existing user.
+func TestAuthenticateClientExistingUser(t *testing.T) {
+	go testClient(t, testUser1, testSecret1)
 
-	// Calculate the HMAC-SHA256 hash of the challenge using the shared secret
-	mac := hmac.New(sha256.New, sharedKey)
-	_, err = mac.Write(challengeBytes)
-	if err != nil {
-		return nil, err
-	}
+	conn, err := listener.Accept()
+	assert.NoError(t, err)
+	defer conn.Close()
 
-	return mac.Sum(nil), nil
+	authenticator := NewAuthenticator(conn, userService, authConfig)
+
+	var userName string
+	userName, err = authenticator.AuthenticateClient()
+	assert.NoError(t, err, "Error authenticating client")
+	assert.Equal(t, testUser1, userName, "Expected user name to be %s, got %s", testUser1, userName)
+
+	t.Logf("Server: Authenticated user: %s\n", userName)
+}
+
+// TestAuthenticateClientFailed tests the authentication of a client with an incorrect secret.
+func TestAuthenticateClientFailed(t *testing.T) {
+	go testClient(t, testUser1, testSecret2)
+
+	conn, err := listener.Accept()
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	authenticator := NewAuthenticator(conn, userService, authConfig)
+
+	var userName string
+	userName, err = authenticator.AuthenticateClient()
+	assert.Error(t, err, "Expected authentication error")
+	assert.Equal(t, "", userName, "Expected user name to be empty, got %s", userName)
+
+	t.Logf("Server: Authentication failed\n")
+}
+
+// TestAuthenticateClientNewUser2 tests the authentication of a new user.
+func TestAuthenticateClientNewUser2(t *testing.T) {
+	go testClient(t, testUser2, testSecret2)
+
+	conn, err := listener.Accept()
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	authenticator := NewAuthenticator(conn, userService, authConfig)
+
+	var userName string
+	userName, err = authenticator.AuthenticateClient()
+	assert.NoError(t, err, "Error authenticating client")
+	assert.Equal(t, testUser2, userName, "Expected user name to be %s, got %s", testUser2, userName)
+
+	secret, found := userService.GetSharedKey(testUser2)
+	assert.True(t, found, "Expected shared key to be found")
+	assert.Equal(t, testSecret2, secret, "Expected shared key to be %v, got %v", testSecret2, secret)
+
+	t.Logf("Server: Authenticated user: %s\n", userName)
+}
+
+func sendMessage(conn net.Conn, message interface{}) error {
+	encoder := gob.NewEncoder(conn)
+	return encoder.Encode(message)
+}
+
+func receiveMessage(conn net.Conn, message interface{}) error {
+	decoder := gob.NewDecoder(conn)
+	return decoder.Decode(message)
+}
+
+func testClient(t *testing.T, testUser string, testSecret []byte) {
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", Port))
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	var challengeMessage globalmodels.ChallengeMessage
+	err = receiveMessage(conn, &challengeMessage)
+	assert.NoError(t, err, "Error receiving challenge message")
+	t.Logf("Client: Received challenge message: %v\n", challengeMessage)
+
+	// Calculate the challenge response.
+	var challengeResponse []byte
+	challengeResponse, err = calculateResponse(challengeMessage.Payload, testSecret)
+	assert.NoError(t, err, "Error calculating response")
+
+	// Send the challenge response to the server.
+	challengeResponsePayload := globalmodels.ChallengeResponse{
+		User:     testUser,
+		Response: challengeResponse,
+	}
+	challengeResponseMessage := globalmodels.ChallengeResponseMessage{
+		Payload: challengeResponsePayload,
+	}
+	err = sendMessage(conn, &challengeResponseMessage)
+	assert.NoError(t, err, "Error sending challenge response message")
+	t.Logf("Client: Sent challenge response message: %v\n", challengeResponseMessage)
+
+	// Receive the new user message from the server.
+	var authResponseMessage globalmodels.AuthResponseMessage
+	err = receiveMessage(conn, &authResponseMessage)
+	assert.NoError(t, err)
+	switch authResponseMessage.Payload {
+	case globalenums.Authenticated:
+		t.Logf("Client: Received authenticated message: %v\n", authResponseMessage)
+	case globalenums.NewUser:
+		t.Logf("Client: Received new user message: %v\n", authResponseMessage)
+		// Send the shared key to the server.
+		err = sendMessage(conn, &testSecret)
+		assert.NoError(t, err)
+		t.Logf("Client: Sent shared key: %v\n", testSecret)
+
+		var authResponseMessageNewUser globalmodels.AuthResponseMessage
+		err = receiveMessage(conn, &authResponseMessageNewUser)
+		assert.NoError(t, err, "Error receiving new user message")
+		assert.Equal(t, globalenums.Authenticated, authResponseMessageNewUser.Payload, "Expected authenticated message, got %v", authResponseMessageNewUser.Payload)
+		t.Logf("Client: Received authenticated message: %v\n", authResponseMessageNewUser)
+	case globalenums.AuthFailed:
+		t.Logf("Client: Received authentication failed message: %v\n", authResponseMessage)
+	default:
+		t.Errorf("Client: Received unexpected message: %v\n", authResponseMessage)
+	}
 }

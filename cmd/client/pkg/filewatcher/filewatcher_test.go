@@ -1,7 +1,7 @@
 package filewatcher
 
 import (
-	"client/pkg/_mocks"
+	"client/pkg/filesyncer/_mocks"
 	"file-sync/pkg/globalenums"
 	"file-sync/pkg/globalmodels"
 	"file-sync/pkg/utils"

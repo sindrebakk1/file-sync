@@ -23,37 +23,5 @@ const (
 )
 
 func (c AuthResult) String() string {
-	return [...]string{"Authenticated", "Unauthorized", "NewUser"}[c]
-}
-
-type MessageType int
-
-const (
-	Exit MessageType = iota
-	Error
-	Authentication
-	FileInfo
-	FileInfoResponse
-	UpdateFile
-	UpdateFileResponse
-	DownloadFile
-	DownloadFileResponse
-	FileInfoMapRequest
-	FileInfoMapResponse
-)
-
-func (c MessageType) String() string {
-	return [...]string{
-		"Exit",
-		"Error",
-		"Authentication",
-		"FileInfo",
-		"FileInfoResponse",
-		"UpdateRequest",
-		"UpdateResponse",
-		"DownloadRequest",
-		"DownloadResponse",
-		"FileInfoMapRequest",
-		"FileInfoMapResponse",
-	}[c]
+	return [...]string{"Authenticated", "NewUser", "Unauthorized"}[c]
 }

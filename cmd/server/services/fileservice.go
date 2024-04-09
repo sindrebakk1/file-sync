@@ -1,38 +1,26 @@
 package services
 
 import (
-	"file-sync/pkg/globalenums"
-	"file-sync/pkg/globalmodels"
+	"bytes"
 	"file-sync/pkg/utils"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"server/models"
 	"server/pkg/fileparser"
 	"sync"
-	"time"
 )
 
 type FileService interface {
-	// GetStatus returns the file with the given ID.
-	GetStatus(hash string, fileInfo *globalmodels.File) (status globalenums.FileStatus, err error)
-	// UpdateStatus updates the status of the file with the given ID.
-	UpdateStatus(hash string, status globalenums.FileStatus) (err error)
-	// GetChecksum returns the checksum of the file with the given ID.
-	GetChecksum(hash string) (checksum string, err error)
-	// UpdateChecksum updates the checksum of the file with the given ID.
-	UpdateChecksum(hash string, checksum string) (err error)
-	// GetLastUpdated returns the last updated time of the file with the given ID.
-	GetLastUpdated(hash string) (lastUpdated time.Time, err error)
-	// UpdateLastUpdated updates the last updated time of the file with the given ID.
-	UpdateLastUpdated(hash string, lastUpdated time.Time) (err error)
-	// GetUploadSession returns the upload session ID of the file with the given ID.
-	GetUploadSession(hash string) (sessionId string, err error)
-	// UploadChunk uploads a chunk of the file with the given session ID.
-	UploadChunk(hash string, sessionId string, chunk []byte) (err error)
-	// CommitChunks commits the chunks of the file with the given session ID and updates the file.
-	CommitChunks(hash string, sessionId string) (err error)
-	// GetFileStream returns a stream of the file with the given ID.
-	GetFileStream(hash string) (stream []byte, err error)
+	// GetFileInfo returns the file with the given ID.
+	GetFileInfo(hash string) (fileInfo *models.SyncedFile, found bool)
+	// GetFile returns a file reader for the file with the given ID.
+	GetFile(hash string) (file *bytes.Buffer, err error)
+	// CreateFile adds a new file to the file service.
+	CreateFile(hash string, checksum string, stream []byte) (err error)
+	// DeleteFile deletes the file with the given ID.
+	DeleteFile(hash string) (err error)
 	// GetFileMap returns the file map.
 	GetFileMap() map[string]*models.SyncedFile
 }
@@ -56,63 +44,112 @@ func (f *concreteFileServiceFactory) NewFileService(dir string) (FileService, er
 }
 
 type concreteFileService struct {
-	dir           string
+	baseDir       string
 	syncedFileMap map[string]*models.SyncedFile
 	mutexes       *sync.Map
 }
 
-func newFileService(dir string) (FileService, error) {
-	fileMap, mutexes, err := initFileMap(dir)
+func newFileService(baseDir string) (FileService, error) {
+	fileMap, mutexes, err := initFileMap(baseDir)
 	if err != nil {
 		return nil, err
 	}
 	return &concreteFileService{
-		dir,
+		baseDir,
 		fileMap,
 		mutexes,
 	}, nil
 }
 
-func (s *concreteFileService) GetStatus(hash string, fileInfo *globalmodels.File) (status globalenums.FileStatus, err error) {
-	return s.syncedFileMap[hash].Status, nil
+func (s *concreteFileService) GetFileInfo(hash string) (fileInfo *models.SyncedFile, found bool) {
+	fileInfo, found = s.syncedFileMap[hash]
+	return fileInfo, found
 }
 
-func (s *concreteFileService) UpdateStatus(hash string, status globalenums.FileStatus) (err error) {
-	s.syncedFileMap[hash].Status = status
+func (s *concreteFileService) GetFile(hash string) (fileBuffer *bytes.Buffer, err error) {
+	syncedFile, found := s.syncedFileMap[hash]
+	if !found {
+		return nil, fmt.Errorf("file not found")
+	}
+
+	// Lock the file
+	mutex, _ := s.mutexes.Load(syncedFile.Hash)
+	mutex.(*sync.Mutex).Lock()
+	defer mutex.(*sync.Mutex).Unlock()
+
+	// Open the file
+	var file *os.File
+	file, err = os.Open(filepath.Join(s.baseDir, hash))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Read the file into a buffer
+	var buffer bytes.Buffer
+	_, err = io.Copy(&buffer, file)
+	if err != nil {
+		return nil, err
+	}
+
+	// Discard the checksum
+	_, err = buffer.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+
+	return &buffer, nil
+}
+
+func (s *concreteFileService) CreateFile(hash string, checksum string, stream []byte) (err error) {
+	mutex, _ := s.mutexes.LoadOrStore(hash, &sync.Mutex{})
+	mutex.(*sync.Mutex).Lock()
+	defer mutex.(*sync.Mutex).Unlock()
+
+	var file *os.File
+	file, err = os.Create(filepath.Join(s.baseDir, hash))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	checksumBytes := []byte(fmt.Sprintf("%s\n", checksum))
+	_, err = file.Write(checksumBytes)
+
+	_, err = file.Write(stream)
+	if err != nil {
+		return err
+	}
+
+	var fileInfo os.FileInfo
+	fileInfo, err = file.Stat()
+	if err != nil {
+		return err
+	}
+
+	s.syncedFileMap[hash] = &models.SyncedFile{
+		Hash:     hash,
+		Checksum: checksum,
+		FileInfo: fileInfo,
+	}
 	return nil
 }
 
-func (s *concreteFileService) GetChecksum(hash string) (checksum string, err error) {
-	return s.syncedFileMap[hash].Checksum, nil
-}
+func (s *concreteFileService) DeleteFile(hash string) (err error) {
+	mutex, _ := s.mutexes.Load(hash)
+	mutex.(*sync.Mutex).Lock()
+	defer func(mutex *sync.Mutex) {
+		mutex.Unlock()
+		s.mutexes.Delete(hash)
+	}(mutex.(*sync.Mutex))
 
-func (s *concreteFileService) UpdateChecksum(hash string, checksum string) (err error) {
-	s.syncedFileMap[hash].Checksum = checksum
+	err = os.Remove(filepath.Join(s.baseDir, hash))
+	if err != nil {
+		return err
+	}
+
+	delete(s.syncedFileMap, hash)
 	return nil
-}
-
-func (s *concreteFileService) GetLastUpdated(hash string) (lastUpdated time.Time, err error) {
-	return s.syncedFileMap[hash].ModTime(), nil
-}
-
-func (s *concreteFileService) UpdateLastUpdated(hash string, lastUpdated time.Time) (err error) {
-	return nil
-}
-
-func (s *concreteFileService) GetUploadSession(hash string) (sessionId string, err error) {
-	return "", nil
-}
-
-func (s *concreteFileService) UploadChunk(hash string, sessionId string, chunk []byte) (err error) {
-	return nil
-}
-
-func (s *concreteFileService) CommitChunks(hash string, sessionId string) (err error) {
-	return nil
-}
-
-func (s *concreteFileService) GetFileStream(hash string) (stream []byte, err error) {
-	return nil, nil
 }
 
 func (s *concreteFileService) GetFileMap() map[string]*models.SyncedFile {
@@ -131,11 +168,15 @@ func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes
 		if err != nil {
 			return err
 		}
+
+		mutex, _ := mutexes.LoadOrStore(info.Name(), &sync.Mutex{})
+		mutex.(*sync.Mutex).Lock()
+		defer mutex.(*sync.Mutex).Unlock()
+
 		var (
 			file     *os.File
 			checksum []byte
 		)
-
 		file, err = os.Open(path)
 		if err != nil {
 			return err
@@ -147,11 +188,16 @@ func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes
 			return err
 		}
 
-		mutexes.Store(info.Name(), &sync.Mutex{})
+		var fileInfo os.FileInfo
+		fileInfo, err = file.Stat()
+		if err != nil {
+			return err
+		}
+
 		fileMap[info.Name()] = &models.SyncedFile{
 			Hash:     info.Name(),
 			Checksum: string(checksum),
-			Status:   globalenums.Unknown,
+			FileInfo: fileInfo,
 		}
 		return nil
 	})

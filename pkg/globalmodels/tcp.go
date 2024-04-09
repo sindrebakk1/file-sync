@@ -1,16 +1,11 @@
 package globalmodels
 
-import "file-sync/pkg/globalenums"
-
-// Message is the base struct for all messages.
-type Message struct {
-	MessageType globalenums.MessageType
-	Payload     interface{}
-}
+import (
+	"file-sync/pkg/globalenums"
+)
 
 // ChallengeMessage contains a challenge for the client.
 type ChallengeMessage struct {
-	Message
 	Payload []byte
 }
 
@@ -20,22 +15,29 @@ type ChallengeResponse struct {
 	User     string
 }
 
-// ChallengeResponseMessage contains information about a challenge response message.
+// ChallengeResponseMessage contains a challenge response for the server.
 type ChallengeResponseMessage struct {
-	Message
 	Payload ChallengeResponse
 }
 
-// AuthResponseMessage contains information about an authentication response message.
+// AuthResponseMessage contains the result of an authentication request.
 type AuthResponseMessage struct {
-	Message
 	Payload globalenums.AuthResult
 }
 
-// NewUserResponseMessage contains a shared key for a new user.
-type NewUserResponseMessage struct {
-	Message
+// SharedKeyMessage contains a shared key for a new user.
+type SharedKeyMessage struct {
 	Payload []byte
+}
+
+// Message is the base struct for all messages.
+type Message struct {
+	TransactionID string
+	Payload       interface{}
+}
+
+type FileMapResponse struct {
+	FileMap map[string]File
 }
 
 // SyncRequest is the payload for a SyncRequestMessage.
@@ -44,31 +46,38 @@ type SyncRequest struct {
 	Info File
 }
 
-// SyncRequestMessage contains information about a file message.
-type SyncRequestMessage struct {
-	Message
-	Payload SyncRequest
-}
-
 // SyncResponse is the payload for a SyncResponseMessage.
 type SyncResponse struct {
 	Info File
 }
 
-// SyncResponseMessage contains information about a file message.
-type SyncResponseMessage struct {
-	Message
-	Payload SyncResponse
+// DownloadRequest is the payload for a DownloadRequestMessage.
+type DownloadRequest struct {
+	Hash string
 }
 
-// FileChunkMessage contains information about a file chunk message.
-type FileChunkMessage struct {
-	Message
-	Payload []byte
+// UploadRequest is the payload for an upload request.
+type UploadRequest struct {
+	Hash     string
+	Checksum string
 }
 
-// ErrorMessage contains information about an error message.
-type ErrorMessage struct {
-	Message
-	Payload string
+// UploadResult is the payload for an upload success message.
+type UploadResult struct {
+	Hash    string
+	Success bool
+}
+
+// FileChunk contains information about a file chunk message.
+type FileChunk struct {
+	Chunk []byte
+	Done  bool
+}
+
+// CloseConnection is a message to close the connection.
+type CloseConnection struct{}
+
+// Error contains information about an error message.
+type Error struct {
+	Message string
 }

@@ -10,11 +10,14 @@ import (
 	"file-sync/pkg/globalenums"
 	"file-sync/pkg/globalmodels"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"net"
 	"server/services"
 )
 
 type Authenticator interface {
 	AuthenticateClient() (userName string, err error)
+	GetFileService() (services.FileService, error)
 }
 
 type Config struct {
@@ -22,18 +25,20 @@ type Config struct {
 }
 
 type concreteAuthenticator struct {
-	encoder     *gob.Encoder
-	decoder     *gob.Decoder
-	userService services.UserService
-	config      *Config
+	conn          net.Conn
+	userService   services.UserService
+	config        *Config
+	authenticated bool
+	userName      string
 }
 
-func NewAuthenticator(encoder *gob.Encoder, decoder *gob.Decoder, userService services.UserService, config *Config) Authenticator {
+func NewAuthenticator(conn net.Conn, userService services.UserService, config *Config) Authenticator {
 	return &concreteAuthenticator{
-		encoder,
-		decoder,
+		conn,
 		userService,
 		config,
+		false,
+		"",
 	}
 }
 
@@ -45,22 +50,22 @@ func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error
 		return "", err
 	}
 	challengeMessage := globalmodels.ChallengeMessage{
-		Message: globalmodels.Message{
-			MessageType: globalenums.Authentication,
-		},
 		Payload: challenge,
 	}
 
 	// Send the challenge to the client.
-	err = a.encoder.Encode(&challengeMessage)
-
-	// Receive the response from the client.
-	var challengeResponseMessage globalmodels.ChallengeResponseMessage
-	err = a.decoder.Decode(&challengeResponseMessage)
+	err = a.sendMessage(&challengeMessage)
 	if err != nil {
 		return "", err
 	}
-	userName = challengeResponseMessage.Payload.User
+
+	// Receive the response from the client.
+	var challengeResponseMessage globalmodels.ChallengeResponseMessage
+	err = a.receiveMessage(&challengeResponseMessage)
+	if err != nil {
+		return "", err
+	}
+	a.userName = challengeResponseMessage.Payload.User
 	challengeResponse := challengeResponseMessage.Payload.Response
 
 	// Get the shared key for the user.
@@ -68,17 +73,14 @@ func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error
 	// If the user is not found, create a new user and receive the shared key.
 	if !found {
 		newUserMessage := globalmodels.AuthResponseMessage{
-			Message: globalmodels.Message{
-				MessageType: globalenums.Authentication,
-			},
 			Payload: globalenums.NewUser,
 		}
-		err = a.encoder.Encode(&newUserMessage)
+		err = a.sendMessage(&newUserMessage)
 		if err != nil {
 			return "", err
 		}
 		// Receive the shared key from the client.
-		err = a.decoder.Decode(&sharedKey)
+		err = a.receiveMessage(&sharedKey)
 		if err != nil {
 			return "", err
 		}
@@ -94,12 +96,9 @@ func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error
 	if !bytes.Equal(expectedResponse, challengeResponse) {
 		// Send the authenticated message to the client.
 		authFailedMessage := globalmodels.AuthResponseMessage{
-			Message: globalmodels.Message{
-				MessageType: globalenums.Authentication,
-			},
 			Payload: globalenums.AuthFailed,
 		}
-		err = a.encoder.Encode(&authFailedMessage)
+		err = a.sendMessage(&authFailedMessage)
 		if err != nil {
 			return "", err
 		}
@@ -108,21 +107,30 @@ func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error
 
 	// Send the authenticated message to the client.
 	authenticatedMessage := globalmodels.AuthResponseMessage{
-		Message: globalmodels.Message{
-			MessageType: globalenums.Authentication,
-		},
 		Payload: globalenums.Authenticated,
 	}
-	err = a.encoder.Encode(&authenticatedMessage)
+	err = a.sendMessage(&authenticatedMessage)
 	if err != nil {
 		return "", err
 	}
 
-	return userName, nil
+	a.authenticated = true
+
+	return a.userName, nil
+}
+
+// GetFileService returns the file service of the authenticated user.
+func (a *concreteAuthenticator) GetFileService() (services.FileService, error) {
+	if !a.authenticated {
+		return nil, fmt.Errorf("not authenticated")
+	}
+	return a.userService.GetFileService(a.userName)
 }
 
 // generateChallenge generates a random challenge of the specified length.
 func generateChallenge(length int) (challenge []byte, err error) {
+	challenge = make([]byte, base64.StdEncoding.EncodedLen(length))
+	log.Debugf("Generating challenge with lenght %d", length)
 	randomBytes := make([]byte, length)
 	_, err = rand.Read(randomBytes)
 	if err != nil {
@@ -148,4 +156,14 @@ func calculateResponse(challenge []byte, sharedKey []byte) (response []byte, err
 	}
 
 	return mac.Sum(nil), nil
+}
+
+func (a *concreteAuthenticator) sendMessage(message interface{}) error {
+	encoder := gob.NewEncoder(a.conn)
+	return encoder.Encode(message)
+}
+
+func (a *concreteAuthenticator) receiveMessage(message interface{}) error {
+	decoder := gob.NewDecoder(a.conn)
+	return decoder.Decode(message)
 }
