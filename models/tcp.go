@@ -1,4 +1,4 @@
-package globalmodels
+package models
 
 import (
 	"file-sync/pkg/globalenums"

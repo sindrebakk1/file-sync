@@ -6,18 +6,19 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/gob"
-	"file-sync/pkg/globalenums"
-	"file-sync/pkg/globalmodels"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"server/enums"
+	"server/models"
 	"server/services"
 )
 
 type Authenticator interface {
-	AuthenticateClient() (userName string, err error)
+	AuthenticateClient(net.Conn) error
 	GetFileService() (services.FileService, error)
+	IsAuthenticated() bool
+	GetUserName() string
 }
 
 type Config struct {
@@ -25,16 +26,14 @@ type Config struct {
 }
 
 type concreteAuthenticator struct {
-	conn          net.Conn
 	userService   services.UserService
 	config        *Config
 	authenticated bool
 	userName      string
 }
 
-func NewAuthenticator(conn net.Conn, userService services.UserService, config *Config) Authenticator {
+func NewAuthenticator(userService services.UserService, config *Config) Authenticator {
 	return &concreteAuthenticator{
-		conn,
 		userService,
 		config,
 		false,
@@ -43,50 +42,60 @@ func NewAuthenticator(conn net.Conn, userService services.UserService, config *C
 }
 
 // AuthenticateClient authenticates the client, creating a new user if necessary.
-func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error) {
+func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 	var challenge []byte
 	challenge, err = generateChallenge(a.config.ChallengeLen)
 	if err != nil {
-		return "", err
+		return err
 	}
-	challengeMessage := globalmodels.ChallengeMessage{
-		Payload: challenge,
+	challengeMessage := models.Message{
+		Header: models.Header{
+			Action: enums.Auth,
+			Sender: enums.Server,
+		},
+		Body: challenge,
+	}
+	_, err = challengeMessage.Send(conn)
+	if err != nil {
+		return err
 	}
 
-	// Send the challenge to the client.
-	err = a.sendMessage(&challengeMessage)
+	var n int
+	var challengeResponseMessage models.Message
+	n, err = challengeResponseMessage.Receive(conn)
 	if err != nil {
-		return "", err
+		return err
 	}
-
-	// Receive the response from the client.
-	var challengeResponseMessage globalmodels.ChallengeResponseMessage
-	err = a.receiveMessage(&challengeResponseMessage)
-	if err != nil {
-		return "", err
+	if n < 1+sha256.Size {
+		return fmt.Errorf("expected at least %d bytes in challengeResponseMessage, got %d", 1+sha256.Size, n)
 	}
-	a.userName = challengeResponseMessage.Payload.User
-	challengeResponse := challengeResponseMessage.Payload.Response
+	challengeResponse := challengeResponseMessage.Body.([]byte)[0:sha256.Size]
+	userName := string(challengeResponseMessage.Body.([]byte)[sha256.Size:])
 
 	// Get the shared key for the user.
 	sharedKey, found := a.userService.GetSharedKey(userName)
 	// If the user is not found, create a new user and receive the shared key.
 	if !found {
-		newUserMessage := globalmodels.AuthResponseMessage{
-			Payload: globalenums.NewUser,
+		newUserMessage := models.Message{
+			Header: models.Header{
+				Action: enums.Auth,
+				Sender: enums.Server,
+			},
+			Body: enums.NewUser,
 		}
-		err = a.sendMessage(&newUserMessage)
+		_, err = newUserMessage.Send(conn)
 		if err != nil {
-			return "", err
+			return err
 		}
-		// Receive the shared key from the client.
-		err = a.receiveMessage(&sharedKey)
+		var sharedKeyMessage models.Message
+		_, err = sharedKeyMessage.Receive(conn)
 		if err != nil {
-			return "", err
+			return err
 		}
+		sharedKey = sharedKeyMessage.Body.([]byte)
 		err = a.userService.Create(userName, sharedKey)
 		if err != nil {
-			return "", err
+			return err
 		}
 	}
 
@@ -95,28 +104,37 @@ func (a *concreteAuthenticator) AuthenticateClient() (userName string, err error
 	expectedResponse, err = calculateResponse(challenge, sharedKey)
 	if !bytes.Equal(expectedResponse, challengeResponse) {
 		// Send the authenticated message to the client.
-		authFailedMessage := globalmodels.AuthResponseMessage{
-			Payload: globalenums.AuthFailed,
+		authFailedMessage := models.Message{
+			Header: models.Header{
+				Action: enums.Auth,
+				Sender: enums.Server,
+			},
+			Body: enums.Unauthorized,
 		}
-		err = a.sendMessage(&authFailedMessage)
+		_, err = authFailedMessage.Send(conn)
 		if err != nil {
-			return "", err
+			return err
 		}
-		return "", fmt.Errorf("challenge failed")
+		return fmt.Errorf("challenge failed")
 	}
 
 	// Send the authenticated message to the client.
-	authenticatedMessage := globalmodels.AuthResponseMessage{
-		Payload: globalenums.Authenticated,
+	authenticatedMessage := models.Message{
+		Header: models.Header{
+			Action: enums.Auth,
+			Sender: enums.Server,
+		},
+		Body: enums.Authenticated,
 	}
-	err = a.sendMessage(&authenticatedMessage)
+	_, err = authenticatedMessage.Send(conn)
 	if err != nil {
-		return "", err
+		return err
 	}
 
+	a.userName = userName
 	a.authenticated = true
 
-	return a.userName, nil
+	return nil
 }
 
 // GetFileService returns the file service of the authenticated user.
@@ -125,6 +143,14 @@ func (a *concreteAuthenticator) GetFileService() (services.FileService, error) {
 		return nil, fmt.Errorf("not authenticated")
 	}
 	return a.userService.GetFileService(a.userName)
+}
+
+func (a *concreteAuthenticator) IsAuthenticated() bool {
+	return a.authenticated
+}
+
+func (a *concreteAuthenticator) GetUserName() string {
+	return a.userName
 }
 
 // generateChallenge generates a random challenge of the specified length.
@@ -156,14 +182,4 @@ func calculateResponse(challenge []byte, sharedKey []byte) (response []byte, err
 	}
 
 	return mac.Sum(nil), nil
-}
-
-func (a *concreteAuthenticator) sendMessage(message interface{}) error {
-	encoder := gob.NewEncoder(a.conn)
-	return encoder.Encode(message)
-}
-
-func (a *concreteAuthenticator) receiveMessage(message interface{}) error {
-	decoder := gob.NewDecoder(a.conn)
-	return decoder.Decode(message)
 }

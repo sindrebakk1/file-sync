@@ -5,7 +5,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"server/pkg/auth"
 	"server/pkg/cache"
-	"server/pkg/fileserver"
+	_ "server/pkg/cache"
+	"server/pkg/mux"
+	fileserver "server/pkg/server"
 	"server/services"
 )
 
@@ -22,7 +24,7 @@ const (
 func main() {
 	log.Info("Starting server...")
 	var (
-		server             fileserver.FileServer
+		server             fileserver.Server
 		userService        services.UserService
 		fileServiceFactory services.FileServiceFactory
 		fileCache          cache.Cache
@@ -33,32 +35,32 @@ func main() {
 		err                error
 	)
 
-	// Initialize services.
-	fileServiceFactory = services.NewFileServiceFactory(BaseDir)
+	// Initialize userService and its dependencies.
+	fileCache = cache.NewCache(FileCacheSize)
+	metaCache = cache.NewCache(MetaCacheSize)
+	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
 	userService = services.NewUserService(fileServiceFactory)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fileCache = cache.NewCache(FileCacheSize)
-	metaCache = cache.NewCache(MetaCacheSize)
+
+	authConfig = &auth.Config{
+		ChallengeLen: ChallengeLen,
+	}
+	authenticator := auth.NewAuthenticator(userService, authConfig)
+
+	clientMux := mux.NewMux(authenticator)
 
 	// Load the TLS certificate.
 	cert, err = tls.LoadX509KeyPair(CertFile, KeyFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	// Initialize the file server.
 	tlsConfig = &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
-	authConfig = &auth.Config{
-		ChallengeLen: ChallengeLen,
-	}
-	server, err = fileserver.NewFileServer(userService, fileCache, metaCache, tlsConfig, authConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+	server = fileserver.NewServer(clientMux, tlsConfig)
 
 	// Start the server.
 	err = server.ListenAndServe(Port)
@@ -73,7 +75,4 @@ func init() {
 	// Configure logging.
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetLevel(log.DebugLevel)
-
-	// Register gob types.
-	fileserver.RegisterGobTypes()
 }

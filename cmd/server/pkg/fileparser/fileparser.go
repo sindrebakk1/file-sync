@@ -2,26 +2,21 @@ package fileparser
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"io"
 )
 
 // Parse extracts the checksum and the raw encrypted file blob from the file content.
-func Parse(content []byte) (checksum []byte, blob []byte, err error) {
+func Parse(content []byte) (checksum string, blob []byte, err error) {
 	// Split content by newline to separate the header and the blob
 	parts := bytes.SplitN(content, []byte("\n"), 2)
 	if len(parts) != 2 {
-		return nil, nil, errors.New("invalid file format: missing newline separator")
+		return "", nil, errors.New("invalid file format: missing newline separator")
 	}
 
 	// Extract checksum from the header (first 32 bytes)
 	checksumBytes := parts[0][:32]
-	checksumHex := string(checksumBytes)
-	checksumBytes, err = hex.DecodeString(checksumHex)
-	if err != nil {
-		return nil, nil, errors.New("invalid checksum format")
-	}
+	checksum = string(checksumBytes)
 
 	// Extract blob from the content after the newline separator
 	blob = parts[1]
@@ -30,17 +25,17 @@ func Parse(content []byte) (checksum []byte, blob []byte, err error) {
 }
 
 // ParseFromReader reads the content from an io.Reader and parses it.
-func ParseFromReader(reader io.Reader) (checksum []byte, blob []byte, err error) {
+func ParseFromReader(reader io.Reader) (checksum string, blob []byte, err error) {
 	var content bytes.Buffer
 	_, err = io.Copy(&content, reader)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 	return Parse(content.Bytes())
 }
 
 // ExtractChecksum extracts the checksum from the file content.
-func ExtractChecksum(content []byte) ([]byte, error) {
+func ExtractChecksum(content []byte) (string, error) {
 	checksum, _, err := Parse(content)
 	return checksum, err
 }
@@ -52,7 +47,7 @@ func ExtractBlob(content []byte) ([]byte, error) {
 }
 
 // ExtractChecksumFromReader reads the content from an io.Reader and extracts the checksum.
-func ExtractChecksumFromReader(reader io.Reader) ([]byte, error) {
+func ExtractChecksumFromReader(reader io.Reader) (string, error) {
 	checksum, _, err := ParseFromReader(reader)
 	return checksum, err
 }

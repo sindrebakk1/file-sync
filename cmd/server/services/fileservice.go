@@ -2,27 +2,28 @@ package services
 
 import (
 	"bytes"
-	"file-sync/pkg/utils"
+	"file-sync/utils"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"server/models"
+	"server/pkg/cache"
 	"server/pkg/fileparser"
 	"sync"
 )
 
 type FileService interface {
-	// GetFileInfo returns the file with the given ID.
-	GetFileInfo(hash string) (fileInfo *models.SyncedFile, found bool)
-	// GetFile returns a file reader for the file with the given ID.
+	// GetFileInfo returns the file with the given TransactionID.
+	GetFileInfo(hash string) (fileInfo *models.FileInfoBytes, found bool)
+	// GetFile returns a file reader for the file with the given TransactionID.
 	GetFile(hash string) (file *bytes.Buffer, err error)
 	// CreateFile adds a new file to the file service.
 	CreateFile(hash string, checksum string, stream []byte) (err error)
-	// DeleteFile deletes the file with the given ID.
+	// DeleteFile deletes the file with the given TransactionID.
 	DeleteFile(hash string) (err error)
 	// GetFileMap returns the file map.
-	GetFileMap() map[string]*models.SyncedFile
+	GetFileMap() map[string]*models.FileInfoBytes
 }
 
 type FileServiceFactory interface {
@@ -30,12 +31,16 @@ type FileServiceFactory interface {
 }
 
 type concreteFileServiceFactory struct {
-	baseDir string
+	baseDir   string
+	fileCache cache.Cache
+	metaCache cache.Cache
 }
 
-func NewFileServiceFactory(baseDir string) FileServiceFactory {
+func NewFileServiceFactory(baseDir string, fileCache cache.Cache, metaCache cache.Cache) FileServiceFactory {
 	return &concreteFileServiceFactory{
 		baseDir,
+		fileCache,
+		metaCache,
 	}
 }
 
@@ -45,7 +50,7 @@ func (f *concreteFileServiceFactory) NewFileService(dir string) (FileService, er
 
 type concreteFileService struct {
 	baseDir       string
-	syncedFileMap map[string]*models.SyncedFile
+	syncedFileMap map[string]*models.FileInfoBytes
 	mutexes       *sync.Map
 }
 
@@ -61,7 +66,7 @@ func newFileService(baseDir string) (FileService, error) {
 	}, nil
 }
 
-func (s *concreteFileService) GetFileInfo(hash string) (fileInfo *models.SyncedFile, found bool) {
+func (s *concreteFileService) GetFileInfo(hash string) (fileInfo *models.FileInfoBytes, found bool) {
 	fileInfo, found = s.syncedFileMap[hash]
 	return fileInfo, found
 }
@@ -73,7 +78,7 @@ func (s *concreteFileService) GetFile(hash string) (fileBuffer *bytes.Buffer, er
 	}
 
 	// Lock the file
-	mutex, _ := s.mutexes.Load(syncedFile.Hash)
+	mutex, _ := s.mutexes.Load(syncedFile.GetHash())
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
@@ -127,11 +132,7 @@ func (s *concreteFileService) CreateFile(hash string, checksum string, stream []
 		return err
 	}
 
-	s.syncedFileMap[hash] = &models.SyncedFile{
-		Hash:     hash,
-		Checksum: checksum,
-		FileInfo: fileInfo,
-	}
+	s.syncedFileMap[hash] = models.NewFileInfoBytes(hash, checksum, fileInfo.ModTime())
 	return nil
 }
 
@@ -152,17 +153,17 @@ func (s *concreteFileService) DeleteFile(hash string) (err error) {
 	return nil
 }
 
-func (s *concreteFileService) GetFileMap() map[string]*models.SyncedFile {
+func (s *concreteFileService) GetFileMap() map[string]*models.FileInfoBytes {
 	return s.syncedFileMap
 }
 
-func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes *sync.Map, err error) {
+func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mutexes *sync.Map, err error) {
 	var normalizedBaseDir string
 	normalizedBaseDir, err = utils.NormalizePath(baseDir)
 	if err != nil {
 		return nil, nil, err
 	}
-	fileMap = make(map[string]*models.SyncedFile)
+	fileMap = make(map[string]*models.FileInfoBytes)
 	mutexes = &sync.Map{}
 	err = filepath.Walk(normalizedBaseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -173,16 +174,14 @@ func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes
 		mutex.(*sync.Mutex).Lock()
 		defer mutex.(*sync.Mutex).Unlock()
 
-		var (
-			file     *os.File
-			checksum []byte
-		)
+		var file *os.File
 		file, err = os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 
+		var checksum string
 		checksum, err = fileparser.ExtractChecksumFromReader(file)
 		if err != nil {
 			return err
@@ -194,11 +193,7 @@ func initFileMap(baseDir string) (fileMap map[string]*models.SyncedFile, mutexes
 			return err
 		}
 
-		fileMap[info.Name()] = &models.SyncedFile{
-			Hash:     info.Name(),
-			Checksum: string(checksum),
-			FileInfo: fileInfo,
-		}
+		fileMap[info.Name()] = models.NewFileInfoBytes(info.Name(), string(checksum), fileInfo.ModTime())
 		return nil
 	})
 	if err != nil {

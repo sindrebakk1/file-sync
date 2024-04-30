@@ -14,7 +14,9 @@ func CalculateSHA256Checksum(path string) (string, error) {
 		log.Debug("Error from os.Open", path)
 		return "", err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(file)
 
 	hasher := sha256.New()
 

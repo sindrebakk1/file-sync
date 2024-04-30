@@ -1,4 +1,4 @@
-package globalenums
+package enums
 
 //type StatusCode int
 
