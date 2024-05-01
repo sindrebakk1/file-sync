@@ -1,4 +1,4 @@
-package auth
+package services
 
 import (
 	"bytes"
@@ -11,14 +11,13 @@ import (
 	"net"
 	"server/enums"
 	"server/models"
-	"server/services"
 )
 
 type Authenticator interface {
 	AuthenticateClient(net.Conn) error
-	GetFileService() (services.FileService, error)
+	GetFileService() (FileService, error)
 	IsAuthenticated() bool
-	GetUserName() string
+	GetUsername() string
 }
 
 type Config struct {
@@ -26,13 +25,13 @@ type Config struct {
 }
 
 type concreteAuthenticator struct {
-	userService   services.UserService
+	userService   UserService
 	config        *Config
 	authenticated bool
 	userName      string
 }
 
-func NewAuthenticator(userService services.UserService, config *Config) Authenticator {
+func NewAuthenticator(userService UserService, config *Config) Authenticator {
 	return &concreteAuthenticator{
 		userService,
 		config,
@@ -97,6 +96,7 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 		if err != nil {
 			return err
 		}
+		log.Debugf("Created new user %s", userName)
 	}
 
 	// Compare the expected response with the received response.
@@ -115,6 +115,7 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 		if err != nil {
 			return err
 		}
+		log.Debugf("Authentication failed for user %s", userName)
 		return fmt.Errorf("challenge failed")
 	}
 
@@ -133,12 +134,13 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 
 	a.userName = userName
 	a.authenticated = true
+	log.Debugf("Authenticated user %s", a.userName)
 
 	return nil
 }
 
 // GetFileService returns the file service of the authenticated user.
-func (a *concreteAuthenticator) GetFileService() (services.FileService, error) {
+func (a *concreteAuthenticator) GetFileService() (FileService, error) {
 	if !a.authenticated {
 		return nil, fmt.Errorf("not authenticated")
 	}
@@ -149,7 +151,7 @@ func (a *concreteAuthenticator) IsAuthenticated() bool {
 	return a.authenticated
 }
 
-func (a *concreteAuthenticator) GetUserName() string {
+func (a *concreteAuthenticator) GetUsername() string {
 	return a.userName
 }
 

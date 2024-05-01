@@ -6,4 +6,5 @@ use (
 	enums
 	models
 	utils
+	integration
 )

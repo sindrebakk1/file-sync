@@ -1,7 +1,7 @@
 package models
 
 import (
-	"file-sync/pkg/globalenums"
+	"file-sync/enums"
 )
 
 // ChallengeMessage contains a challenge for the client.
@@ -22,7 +22,7 @@ type ChallengeResponseMessage struct {
 
 // AuthResponseMessage contains the result of an authentication request.
 type AuthResponseMessage struct {
-	Payload globalenums.AuthResult
+	Payload enums.AuthResult
 }
 
 // SharedKeyMessage contains a shared key for a new user.

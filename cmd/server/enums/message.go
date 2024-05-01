@@ -10,10 +10,11 @@ const (
 	List
 	Auth
 	Error
+	Cancel
 )
 
 func (a MessageType) String() string {
-	return [...]string{"Status", "Upload", "Download", "Delete", "List", "Auth", "Error"}[a]
+	return [...]string{"Status", "Upload", "Download", "Delete", "List", "Auth", "Error", "Cancel"}[a]
 }
 
 type Done uint8

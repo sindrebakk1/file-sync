@@ -1,4 +1,4 @@
-package auth
+package services
 
 import (
 	"fmt"
@@ -8,20 +8,19 @@ import (
 	"server/enums"
 	"server/models"
 	"server/pkg/cache"
-	"server/services"
 	"testing"
 )
 
 const (
 	BaseDir      = "test"
 	ChallengeLen = 32
-	Port         = 8081
+	Port         = 5000
 )
 
 var (
-	userService        services.UserService
+	userService        UserService
 	authConfig         *Config
-	fileServiceFactory services.FileServiceFactory
+	fileServiceFactory FileServiceFactory
 	listener           net.Listener
 
 	// Test users
@@ -34,8 +33,8 @@ var (
 func TestMain(m *testing.M) {
 	fileCache := cache.NewCache(100)
 	metaCache := cache.NewCache(100)
-	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
-	userService = services.NewUserService(fileServiceFactory)
+	fileServiceFactory = NewFileServiceFactory(BaseDir, fileCache, metaCache)
+	userService = NewUserService(fileServiceFactory)
 	authConfig = &Config{
 		ChallengeLen: ChallengeLen,
 	}
@@ -63,7 +62,7 @@ func TestAuthenticateClientNewUser(t *testing.T) {
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
 	assert.True(t, authenticator.IsAuthenticated(), "Expected authenticated to be true")
-	assert.Equal(t, testUser1, authenticator.GetUserName(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUserName())
+	assert.Equal(t, testUser1, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUsername())
 }
 
 // TestAuthenticateClientExistingUser tests the authentication of an existing user.
@@ -79,7 +78,7 @@ func TestAuthenticateClientExistingUser(t *testing.T) {
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
 	assert.True(t, authenticator.IsAuthenticated(), "Expected authenticated to be true")
-	assert.Equal(t, testUser1, authenticator.GetUserName(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUserName())
+	assert.Equal(t, testUser1, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUsername())
 }
 
 // TestAuthenticateClientFailed tests the authentication of a client with an incorrect secret.
@@ -95,7 +94,7 @@ func TestAuthenticateClientFailed(t *testing.T) {
 	err = authenticator.AuthenticateClient(conn)
 	assert.Error(t, err, "Expected authentication error")
 	assert.False(t, authenticator.IsAuthenticated(), "Expected authenticated to be false")
-	assert.Equal(t, "", authenticator.GetUserName(), "Expected user name to be empty, got %s", authenticator.GetUserName())
+	assert.Equal(t, "", authenticator.GetUsername(), "Expected user name to be empty, got %s", authenticator.GetUsername())
 }
 
 // TestAuthenticateClientNewUser2 tests the authentication of a new user.
@@ -110,7 +109,7 @@ func TestAuthenticateClientNewUser2(t *testing.T) {
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
-	assert.Equal(t, testUser2, authenticator.GetUserName(), "Expected user name to be %s, got %s", testUser2, authenticator.GetUserName())
+	assert.Equal(t, testUser2, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser2, authenticator.GetUsername())
 
 	secret, found := userService.GetSharedKey(testUser2)
 	assert.True(t, found, "Expected shared key to be found")

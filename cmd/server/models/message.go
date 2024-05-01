@@ -85,6 +85,8 @@ func (m *Message) unmarshalBinary(reader io.Reader) (int, error) {
 	}
 
 	switch m.Header.Action {
+	case enums.Auth:
+		m.Body = body
 	case enums.Status:
 		if m.Header.Sender == enums.Client {
 			m.Body = StatusRequest(body)
@@ -135,8 +137,8 @@ func (m *Message) unmarshalBinary(reader io.Reader) (int, error) {
 			}
 			break
 		}
-	case enums.Auth:
-		m.Body = body
+	case enums.Cancel:
+		m.Body = nil
 	default:
 		return 0, fmt.Errorf("unknown action: %s", m.Header.Action)
 	}
