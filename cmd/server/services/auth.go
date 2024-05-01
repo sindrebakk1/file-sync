@@ -6,14 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	enums2 "file-sync/enums"
+	"file-sync/models"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"server/enums"
-	"server/models"
 )
 
-type Authenticator interface {
+type AuthService interface {
 	AuthenticateClient(net.Conn) error
 	GetFileService() (FileService, error)
 	IsAuthenticated() bool
@@ -24,15 +24,15 @@ type Config struct {
 	ChallengeLen int
 }
 
-type concreteAuthenticator struct {
+type concreteAutService struct {
 	userService   UserService
 	config        *Config
 	authenticated bool
 	userName      string
 }
 
-func NewAuthenticator(userService UserService, config *Config) Authenticator {
-	return &concreteAuthenticator{
+func NewAuthService(userService UserService, config *Config) AuthService {
+	return &concreteAutService{
 		userService,
 		config,
 		false,
@@ -41,7 +41,7 @@ func NewAuthenticator(userService UserService, config *Config) Authenticator {
 }
 
 // AuthenticateClient authenticates the client, creating a new user if necessary.
-func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
+func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 	var challenge []byte
 	challenge, err = generateChallenge(a.config.ChallengeLen)
 	if err != nil {
@@ -49,8 +49,8 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 	}
 	challengeMessage := models.Message{
 		Header: models.Header{
-			Action: enums.Auth,
-			Sender: enums.Server,
+			Action: enums2.Auth,
+			Sender: enums2.Server,
 		},
 		Body: challenge,
 	}
@@ -77,10 +77,10 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 	if !found {
 		newUserMessage := models.Message{
 			Header: models.Header{
-				Action: enums.Auth,
-				Sender: enums.Server,
+				Action: enums2.Auth,
+				Sender: enums2.Server,
 			},
-			Body: enums.NewUser,
+			Body: enums2.NewUser,
 		}
 		_, err = newUserMessage.Send(conn)
 		if err != nil {
@@ -106,10 +106,10 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 		// Send the authenticated message to the client.
 		authFailedMessage := models.Message{
 			Header: models.Header{
-				Action: enums.Auth,
-				Sender: enums.Server,
+				Action: enums2.Auth,
+				Sender: enums2.Server,
 			},
-			Body: enums.Unauthorized,
+			Body: enums2.Unauthorized,
 		}
 		_, err = authFailedMessage.Send(conn)
 		if err != nil {
@@ -122,10 +122,10 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 	// Send the authenticated message to the client.
 	authenticatedMessage := models.Message{
 		Header: models.Header{
-			Action: enums.Auth,
-			Sender: enums.Server,
+			Action: enums2.Auth,
+			Sender: enums2.Server,
 		},
-		Body: enums.Authenticated,
+		Body: enums2.Authenticated,
 	}
 	_, err = authenticatedMessage.Send(conn)
 	if err != nil {
@@ -140,18 +140,18 @@ func (a *concreteAuthenticator) AuthenticateClient(conn net.Conn) (err error) {
 }
 
 // GetFileService returns the file service of the authenticated user.
-func (a *concreteAuthenticator) GetFileService() (FileService, error) {
+func (a *concreteAutService) GetFileService() (FileService, error) {
 	if !a.authenticated {
 		return nil, fmt.Errorf("not authenticated")
 	}
 	return a.userService.GetFileService(a.userName)
 }
 
-func (a *concreteAuthenticator) IsAuthenticated() bool {
+func (a *concreteAutService) IsAuthenticated() bool {
 	return a.authenticated
 }
 
-func (a *concreteAuthenticator) GetUsername() string {
+func (a *concreteAutService) GetUsername() string {
 	return a.userName
 }
 

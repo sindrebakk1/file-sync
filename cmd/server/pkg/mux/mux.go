@@ -3,10 +3,10 @@ package mux
 import (
 	"context"
 	"errors"
+	"file-sync/enums"
+	"file-sync/models"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"server/enums"
-	"server/models"
 	"server/pkg/session"
 	"server/services"
 	"sync"
@@ -18,7 +18,7 @@ type Request struct {
 	Ctx     context.Context
 }
 
-type HandlerFunc func(chan models.Message, *Request)
+type HandlerFunc func(chan models.Message, *Request) error
 
 type Mux interface {
 	Handle(action enums.MessageType, handler HandlerFunc)
@@ -27,11 +27,12 @@ type Mux interface {
 
 type concreteMux struct {
 	handlers      map[enums.MessageType]HandlerFunc
-	authenticator services.Authenticator
+	authenticator services.AuthService
 	ctx           context.Context
 }
 
-func NewMux(authenticator services.Authenticator, ctx context.Context) Mux {
+func NewMux(authenticator services.AuthService) Mux {
+	ctx := context.WithoutCancel(context.Background())
 	return &concreteMux{
 		make(map[enums.MessageType]HandlerFunc),
 		authenticator,
@@ -46,10 +47,7 @@ func (m *concreteMux) Handle(action enums.MessageType, handlerFunc HandlerFunc) 
 func (m *concreteMux) ServeConn(conn net.Conn) {
 	defer conn.Close()
 
-	connCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
-	defer cancel()
-
-	sessionData := &session.Data{
+	sessionData := &session.Session{
 		Transactions: &sync.Map{},
 	}
 
@@ -58,7 +56,8 @@ func (m *concreteMux) ServeConn(conn net.Conn) {
 		return
 	}
 
-	ctx := session.NewContext(connCtx, sessionData)
+	ctx, cancel := session.NewContext(m.ctx, sessionData)
+	defer cancel()
 
 	resChan := handleResponses(conn, ctx)
 
@@ -88,18 +87,19 @@ func (m *concreteMux) ServeConn(conn net.Conn) {
 			return
 		}
 
+		reqCtx, cancelReq := context.WithTimeout(ctx, time.Second*5)
 		req := &Request{
 			Message: message,
-			Ctx:     ctx,
+			Ctx:     reqCtx,
 		}
-		err = m.handleRequest(resChan, req)
+		err = m.handleRequest(resChan, req, cancelReq)
 		if err != nil {
 			log.Error("Error handling request: ", err)
 		}
 	}
 }
 
-func (m *concreteMux) authenticateClient(conn net.Conn, session *session.Data) error {
+func (m *concreteMux) authenticateClient(conn net.Conn, session *session.Session) error {
 	err := m.authenticator.AuthenticateClient(conn)
 	if err != nil {
 		return err
@@ -112,30 +112,6 @@ func (m *concreteMux) authenticateClient(conn net.Conn, session *session.Data) e
 	return nil
 }
 
-func (m *concreteMux) handleRequest(resChan chan models.Message, req *Request) error {
-	handler, ok := m.handlers[req.Message.Header.Action]
-	if !ok {
-		return errors.New("unknown action")
-	}
-	var sessionData *session.Data
-	sessionData, ok = session.FromContext(req.Ctx)
-	if !ok {
-		return errors.New("no session data in context")
-	}
-	var transactionChan chan models.Message
-	transactionChan, ok = sessionData.GetTransaction(req.Message.Header.TransactionID)
-	if ok {
-		transactionChan <- req.Message
-		return nil
-	}
-
-	_ = sessionData.NewTransaction(req.Message.Header.TransactionID)
-	go handler(resChan, req)
-
-	return nil
-}
-
-// handleResponses listens for responses on the response channel and sends them to the client.
 func handleResponses(conn net.Conn, ctx context.Context) chan models.Message {
 	responseChan := make(chan models.Message, 5)
 	go func() {
@@ -157,4 +133,33 @@ func handleResponses(conn net.Conn, ctx context.Context) chan models.Message {
 		}
 	}()
 	return responseChan
+}
+
+func (m *concreteMux) handleRequest(resChan chan models.Message, req *Request, cancel context.CancelFunc) error {
+	handler, ok := m.handlers[req.Message.Header.Action]
+	if !ok {
+		return errors.New("unknown action")
+	}
+	var sessionData *session.Session
+	sessionData, ok = session.FromContext(req.Ctx)
+	if !ok {
+		return errors.New("no session data in context")
+	}
+	var transactionChan chan models.Message
+	transactionChan, ok = sessionData.GetTransaction(req.Message.Header.TransactionID)
+	if ok {
+		transactionChan <- req.Message
+		return nil
+	}
+	go func() {
+		sessionData.NewTransaction(req.Message.Header.TransactionID)
+		defer sessionData.Transactions.Delete(req.Message.Header.TransactionID)
+		defer cancel()
+
+		err := handler(resChan, req)
+		if err != nil {
+			log.Error("Error handling request: ", err)
+		}
+	}()
+	return nil
 }

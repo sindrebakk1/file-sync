@@ -1,12 +1,12 @@
 package services
 
 import (
+	enums2 "file-sync/enums"
+	"file-sync/models"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"os"
-	"server/enums"
-	"server/models"
 	"server/pkg/cache"
 	"testing"
 )
@@ -57,7 +57,7 @@ func TestAuthenticateClientNewUser(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthenticator(userService, authConfig)
+	authenticator := NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -73,7 +73,7 @@ func TestAuthenticateClientExistingUser(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthenticator(userService, authConfig)
+	authenticator := NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -89,7 +89,7 @@ func TestAuthenticateClientFailed(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthenticator(userService, authConfig)
+	authenticator := NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.Error(t, err, "Expected authentication error")
@@ -105,7 +105,7 @@ func TestAuthenticateClientNewUser2(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthenticator(userService, authConfig)
+	authenticator := NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -134,7 +134,7 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 	challengeResponsePayload := append(challengeResponse, []byte(testUser)...)
 	challengeResponseMessage := models.Message{
 		Header: models.Header{
-			Action: enums.Auth,
+			Action: enums2.Auth,
 		},
 		Body: challengeResponsePayload,
 	}
@@ -146,16 +146,16 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 	_, err = authResponseMessage.Receive(conn)
 	assert.NoError(t, err)
 
-	result := enums.AuthResult(authResponseMessage.Body.([]byte)[0])
+	result := enums2.AuthResult(authResponseMessage.Body.([]byte)[0])
 	switch result {
-	case enums.Authenticated:
+	case enums2.Authenticated:
 		t.Logf("Client: Received authenticated message: %v\n", authResponseMessage)
-	case enums.NewUser:
+	case enums2.NewUser:
 		t.Logf("Client: Received new user message: %v\n", authResponseMessage)
 		// Send the shared key to the server.
 		secretMessage := models.Message{
 			Header: models.Header{
-				Action: enums.Auth,
+				Action: enums2.Auth,
 			},
 			Body: testSecret,
 		}
@@ -166,9 +166,9 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 		_, err = responseMessage.Receive(conn)
 		assert.NoError(t, err, "Error receiving new user response message")
 		t.Logf("Client: Received authenticated message: %v\n", responseMessage)
-		result = enums.AuthResult(responseMessage.Body.([]byte)[0])
-		assert.Equal(t, enums.Authenticated, result, "Expected authenticated message, got %v", result)
-	case enums.Unauthorized:
+		result = enums2.AuthResult(responseMessage.Body.([]byte)[0])
+		assert.Equal(t, enums2.Authenticated, result, "Expected authenticated message, got %v", result)
+	case enums2.Unauthorized:
 		t.Logf("Client: Received authentication failed message: %v\n", authResponseMessage)
 	default:
 		t.Errorf("Client: Received unexpected message: %v\n", authResponseMessage)

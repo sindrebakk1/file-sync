@@ -2,12 +2,11 @@ package services
 
 import (
 	"bytes"
-	"file-sync/utils"
+	"file-sync/models"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"server/models"
 	"server/pkg/cache"
 	"server/pkg/fileparser"
 	"sync"
@@ -159,12 +158,18 @@ func (s *concreteFileService) GetFileMap() map[string]*models.FileInfoBytes {
 
 func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mutexes *sync.Map, err error) {
 	var normalizedBaseDir string
-	normalizedBaseDir, err = utils.NormalizePath(baseDir)
+	normalizedBaseDir, err = filepath.Abs(baseDir)
 	if err != nil {
 		return nil, nil, err
 	}
+	normalizedBaseDir = filepath.Clean(normalizedBaseDir)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	fileMap = make(map[string]*models.FileInfoBytes)
 	mutexes = &sync.Map{}
+
 	err = filepath.Walk(normalizedBaseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

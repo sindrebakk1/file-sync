@@ -3,15 +3,15 @@ package main
 import (
 	"crypto/tls"
 	"errors"
+	"file-sync/constants"
+	"file-sync/enums"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"path/filepath"
-	"server/constants"
-	"server/enums"
 	"server/pkg/cache"
+	"server/pkg/fileserver"
 	"server/pkg/mux"
-	fileserver "server/pkg/server"
 	"server/services"
 )
 
@@ -54,7 +54,7 @@ func main() {
 	authConfig = &services.Config{
 		ChallengeLen: ChallengeLen,
 	}
-	authenticator := services.NewAuthenticator(userService, authConfig)
+	authenticator := services.NewAuthService(userService, authConfig)
 
 	tcpMux := mux.NewMux(authenticator)
 
@@ -97,7 +97,7 @@ func init() {
 	viper.SetDefault("log.level", log.ErrorLevel)
 
 	// Configure environment variables.
-	viper.SetEnvPrefix(constants.APP_NAME)
+	viper.SetEnvPrefix(constants.AppName)
 	viper.AutomaticEnv()
 
 	Environment = enums.Environment(viper.GetString("env"))
@@ -116,8 +116,8 @@ func init() {
 	// Set the configuration file name and path.
 	viper.SetConfigName(configName)
 	viper.SetConfigType("json")
-	viper.AddConfigPath(fmt.Sprintf("/etc/%s", constants.APP_NAME))
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constants.APP_NAME))
+	viper.AddConfigPath(fmt.Sprintf("/etc/%s", constants.AppName))
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", constants.AppName))
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
