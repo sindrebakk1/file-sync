@@ -1,0 +1,8 @@
+{
+  "tls": {
+    "dir": "/root/certs",
+    "data": {
+      "dir": "/var/lib/filesync"
+    }
+  }
+}

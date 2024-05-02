@@ -44,6 +44,7 @@ func NewAuthService(userService UserService, config *Config) AuthService {
 func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 	var challenge []byte
 	challenge, err = generateChallenge(a.config.ChallengeLen)
+	log.Debugf("Generated challenge: %s", challenge)
 	if err != nil {
 		return err
 	}
@@ -70,11 +71,13 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 	}
 	challengeResponse := challengeResponseMessage.Body.([]byte)[0:sha256.Size]
 	userName := string(challengeResponseMessage.Body.([]byte)[sha256.Size:])
+	log.Debugf("Received challenge response, response: %s, username: %s", string(challengeResponse), userName)
 
 	// Get the shared key for the user.
 	sharedKey, found := a.userService.GetSharedKey(userName)
 	// If the user is not found, create a new user and receive the shared key.
 	if !found {
+		log.Debugf("User %s not found, creating new user", userName)
 		newUserMessage := models.Message{
 			Header: models.Header{
 				Action: enums2.Auth,
@@ -158,7 +161,6 @@ func (a *concreteAutService) GetUsername() string {
 // generateChallenge generates a random challenge of the specified length.
 func generateChallenge(length int) (challenge []byte, err error) {
 	challenge = make([]byte, base64.StdEncoding.EncodedLen(length))
-	log.Debugf("Generating challenge with lenght %d", length)
 	randomBytes := make([]byte, length)
 	_, err = rand.Read(randomBytes)
 	if err != nil {

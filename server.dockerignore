@@ -1,6 +1,4 @@
 cmd/client
-cmd/server/data
-
-integration_tests
-
+integration
+_*
 .devcontainer

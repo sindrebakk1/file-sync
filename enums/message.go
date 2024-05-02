@@ -11,10 +11,11 @@ const (
 	Auth
 	Error
 	Cancel
+	Echo
 )
 
 func (a MessageType) String() string {
-	return [...]string{"Status", "Upload", "Download", "Delete", "List", "Auth", "Error", "Cancel"}[a]
+	return [...]string{"Status", "Upload", "Download", "Delete", "List", "Auth", "Error", "Cancel", "Echo"}[a]
 }
 
 type Done uint8

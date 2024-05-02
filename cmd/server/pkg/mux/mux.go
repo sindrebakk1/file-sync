@@ -23,21 +23,28 @@ type HandlerFunc func(chan models.Message, *Request) error
 type Mux interface {
 	Handle(action enums.MessageType, handler HandlerFunc)
 	ServeConn(net.Conn)
+	Shutdown()
 }
 
 type concreteMux struct {
 	handlers      map[enums.MessageType]HandlerFunc
 	authenticator services.AuthService
 	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 func NewMux(authenticator services.AuthService) Mux {
-	ctx := context.WithoutCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	return &concreteMux{
 		make(map[enums.MessageType]HandlerFunc),
 		authenticator,
 		ctx,
+		cancel,
 	}
+}
+
+func (m *concreteMux) Shutdown() {
+	m.cancel()
 }
 
 func (m *concreteMux) Handle(action enums.MessageType, handlerFunc HandlerFunc) {
@@ -46,6 +53,8 @@ func (m *concreteMux) Handle(action enums.MessageType, handlerFunc HandlerFunc) 
 
 func (m *concreteMux) ServeConn(conn net.Conn) {
 	defer conn.Close()
+
+	log.Debugf("Serving connection from %s", conn.RemoteAddr().String())
 
 	sessionData := &session.Session{
 		Transactions: &sync.Map{},
@@ -152,7 +161,6 @@ func (m *concreteMux) handleRequest(resChan chan models.Message, req *Request, c
 		return nil
 	}
 	go func() {
-		sessionData.NewTransaction(req.Message.Header.TransactionID)
 		defer sessionData.Transactions.Delete(req.Message.Header.TransactionID)
 		defer cancel()
 

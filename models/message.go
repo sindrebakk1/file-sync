@@ -3,12 +3,11 @@ package models
 import (
 	"bytes"
 	"encoding/binary"
-	globalenums "file-sync/enums"
+	"file-sync/constants"
+	"file-sync/enums"
 	"fmt"
 	"io"
 	"net"
-	"server/constants"
-	"server/models"
 )
 
 const (
@@ -18,8 +17,8 @@ const (
 
 type Header struct {
 	Version       uint8
-	Sender        globalenums.Sender
-	Action        globalenums.MessageType
+	Sender        enums.Sender
+	Action        enums.MessageType
 	Length        uint16
 	TransactionID [TransactionIDSize]byte
 }
@@ -30,31 +29,31 @@ type Message struct {
 }
 
 // StatusRequest is the type of Message.Body for a Status request.
-type StatusRequest models.FileInfoBytes
+type StatusRequest FileInfoBytes
 
 // StatusResponse is the type of Message.Body for a Status response.
-type StatusResponse globalenums.FileStatus
+type StatusResponse enums.FileStatus
 
 // UploadRequest is the type of Message.Body for an Upload request.
 type UploadRequest []byte
 
 // UploadResponse is the type of Message.Body for an Upload response.
-type UploadResponse globalenums.Done
+type UploadResponse enums.Done
 
 // DownloadRequest is the type of Message.Body for a Download request.
-type DownloadRequest models.FileHash
+type DownloadRequest FileHash
 
 // DownloadResponse is the type of Message.Body for a Download response.
 type DownloadResponse []byte
 
 // DeleteRequest is the type of Message.Body for a Delete request.
-type DeleteRequest models.FileHash
+type DeleteRequest FileHash
 
 // DeleteResponse is the type of Message.Body for a Delete response.
-type DeleteResponse globalenums.Done
+type DeleteResponse enums.Done
 
 // ListResponse is the type of Message.Body for a List response.
-type ListResponse []models.FileInfoBytes
+type ListResponse []FileInfoBytes
 
 func (m *Message) unmarshalBinary(reader io.Reader) (int, error) {
 	header := make([]byte, HeaderSize)
@@ -69,8 +68,8 @@ func (m *Message) unmarshalBinary(reader io.Reader) (int, error) {
 	if m.Header.Version != constants.Version {
 		return 0, fmt.Errorf("unsupported version: %d", m.Header.Version)
 	}
-	m.Header.Sender = globalenums.Sender(header[1])
-	m.Header.Action = globalenums.MessageType(header[2])
+	m.Header.Sender = enums.Sender(header[1])
+	m.Header.Action = enums.MessageType(header[2])
 	m.Header.Length = binary.BigEndian.Uint16(header[3:5])
 	transactionID := header[5 : 5+TransactionIDSize]
 	copy(m.Header.TransactionID[:], transactionID)
@@ -85,60 +84,62 @@ func (m *Message) unmarshalBinary(reader io.Reader) (int, error) {
 	}
 
 	switch m.Header.Action {
-	case globalenums.Auth:
+	case enums.Auth:
 		m.Body = body
-	case globalenums.Status:
-		if m.Header.Sender == globalenums.Client {
+	case enums.Status:
+		if m.Header.Sender == enums.Client {
 			m.Body = StatusRequest(body)
 			break
 		}
-		if m.Header.Sender == globalenums.Server {
+		if m.Header.Sender == enums.Server {
 			m.Body = StatusResponse(body[0])
 			break
 		}
-	case globalenums.Upload:
-		if m.Header.Sender == globalenums.Client {
+	case enums.Upload:
+		if m.Header.Sender == enums.Client {
 			m.Body = UploadRequest(body)
 			break
 		}
-		if m.Header.Sender == globalenums.Server {
+		if m.Header.Sender == enums.Server {
 			m.Body = UploadResponse(body[0])
 			break
 		}
-	case globalenums.Download:
-		if m.Header.Sender == globalenums.Client {
+	case enums.Download:
+		if m.Header.Sender == enums.Client {
 			m.Body = DownloadRequest(body)
 			break
 		}
-		if m.Header.Sender == globalenums.Server {
+		if m.Header.Sender == enums.Server {
 			m.Body = DownloadResponse(body)
 			break
 		}
-	case globalenums.Delete:
-		if m.Header.Sender == globalenums.Client {
+	case enums.Delete:
+		if m.Header.Sender == enums.Client {
 			m.Body = DeleteRequest(body)
 			break
 		}
-		if m.Header.Sender == globalenums.Server {
+		if m.Header.Sender == enums.Server {
 			m.Body = DeleteResponse(body[0])
 			break
 		}
-	case globalenums.List:
-		if m.Header.Sender == globalenums.Client {
+	case enums.List:
+		if m.Header.Sender == enums.Client {
 			m.Body = nil
 			break
 		}
-		if m.Header.Sender == globalenums.Server {
+		if m.Header.Sender == enums.Server {
 			// loop over body and create FileInfoBytes
-			var fileInfoBytes models.FileInfoBytes
-			for i := 0; i < len(body); i += models.FileInfoSize {
-				copy(fileInfoBytes[:], body[i:i+models.FileInfoSize])
-				m.Body = append(m.Body.([]models.FileInfoBytes), fileInfoBytes)
+			var fileInfoBytes FileInfoBytes
+			for i := 0; i < len(body); i += FileInfoSize {
+				copy(fileInfoBytes[:], body[i:i+FileInfoSize])
+				m.Body = append(m.Body.([]FileInfoBytes), fileInfoBytes)
 			}
 			break
 		}
-	case globalenums.Cancel:
+	case enums.Cancel:
 		m.Body = nil
+	case enums.Echo:
+		m.Body = body
 	default:
 		return 0, fmt.Errorf("unknown action: %s", m.Header.Action)
 	}

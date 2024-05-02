@@ -1,9 +1,13 @@
 package handlers
 
 import (
-	globalmodels "file-sync/models"
+	"file-sync/models"
+	log "github.com/sirupsen/logrus"
+	"server/pkg/mux"
 )
 
-func handleStatusRequest(transactionID string, request globalmodels.SyncRequest) {
-
+// HandleStatus is a mux.HandlerFunc
+func HandleStatus(resChan chan models.Message, req *mux.Request) error {
+	log.Debug("HandleStatus")
+	return nil
 }

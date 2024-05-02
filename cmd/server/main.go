@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"server/pkg/cache"
 	"server/pkg/fileserver"
+	"server/pkg/handlers"
 	"server/pkg/mux"
 	"server/services"
 )
@@ -42,21 +43,26 @@ func main() {
 		err                error
 	)
 
-	// Initialize userService and its dependencies.
+	// Initialize caches.
 	fileCache = cache.NewCache(FileCacheSize)
 	metaCache = cache.NewCache(MetaCacheSize)
+
+	// Initialize services.
 	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
 	userService = services.NewUserService(fileServiceFactory)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	authConfig = &services.Config{
 		ChallengeLen: ChallengeLen,
 	}
-	authenticator := services.NewAuthService(userService, authConfig)
+	authService := services.NewAuthService(userService, authConfig)
 
-	tcpMux := mux.NewMux(authenticator)
+	// Initialize the mux.
+	tcpMux := mux.NewMux(authService)
+	tcpMux.Handle(enums.Status, handlers.HandleStatus)
+	tcpMux.Handle(enums.Download, handlers.HandleDownload)
+	tcpMux.Handle(enums.Upload, handlers.HandleUpload)
+	tcpMux.Handle(enums.Delete, handlers.HandleDelete)
+	tcpMux.Handle(enums.List, handlers.HandleList)
+	tcpMux.Handle(enums.Echo, handlers.HandleEcho)
 
 	// Load the TLS certificate.
 	var certDir string
@@ -68,6 +74,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	// Initialize the file server.
 	tlsConfig = &tls.Config{
 		Certificates: []tls.Certificate{cert},
@@ -89,12 +96,12 @@ func init() {
 	viper.SetDefault("port", 443)
 	viper.SetDefault("cache.file.size", 1_000)
 	viper.SetDefault("cache.meta.size", 100_000)
-	viper.SetDefault("tls.dir", "./certs")
+	viper.SetDefault("tls.dir", "_certs")
 	viper.SetDefault("tls.cert", "server.crt")
 	viper.SetDefault("tls.key", "server.key")
-	viper.SetDefault("data.dir", "./data")
+	viper.SetDefault("data.dir", "_data")
 	viper.SetDefault("auth.challenge.len", 32)
-	viper.SetDefault("log.level", log.ErrorLevel)
+	viper.SetDefault("log.level", log.DebugLevel)
 
 	// Configure environment variables.
 	viper.SetEnvPrefix(constants.AppName)
@@ -110,7 +117,7 @@ func init() {
 	case enums.Development:
 		configName = "config.dev"
 	default:
-		log.Fatalf("invalid environment: %s", Environment)
+		panic(fmt.Errorf("invalid environment: %s", Environment))
 	}
 
 	// Set the configuration file name and path.
@@ -122,7 +129,7 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
-			log.Fatal(err)
+			panic(err)
 		}
 	}
 

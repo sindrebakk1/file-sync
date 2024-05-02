@@ -8,6 +8,8 @@
 *.so
 *.dylib
 
+_*
+
 /cmd/server/data
 
 # Test binary, built with `go test -c`
@@ -23,7 +25,6 @@
 go.work
 
 # Certificates
-certs
 *.pem
 *.key
 *.csr
