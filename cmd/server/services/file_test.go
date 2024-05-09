@@ -1,12 +1,15 @@
-package services
+package services_test
 
 import (
 	"github.com/stretchr/testify/assert"
+	"server/services"
 	"testing"
 )
 
 var (
-	testDir      = "test_dir"
+	testBaseDir  = "testdata"
+	testUserDir  = "user"
+	testDir      = testBaseDir + "/" + testUserDir
 	testHash     = "hash123"
 	testChecksum = "checksum123456789012345678901234"
 )
@@ -28,19 +31,22 @@ func TestNewFileServiceFactory(t *testing.T) {
 	fileCache := &MockCache{}
 	metaCache := &MockCache{}
 
-	factory := NewFileServiceFactory(testDir, fileCache, metaCache)
-
+	factory := services.NewFileServiceFactory(testDir, fileCache, metaCache)
 	assert.NotNil(t, factory)
+
+	fileService, err := factory.NewFileService(testUserDir)
+	assert.NoError(t, err)
+	assert.NotNil(t, fileService)
 }
 
 func TestNewFileService(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 	assert.NotNil(t, fileService)
 }
 
 func TestGetFileInfo(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	fileInfo, found := fileService.GetFileInfo(testHash)
@@ -50,7 +56,7 @@ func TestGetFileInfo(t *testing.T) {
 }
 
 func TestGetFileInfo_NotFound(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	fileInfo, found := fileService.GetFileInfo("nonexistent_hash")
@@ -59,7 +65,7 @@ func TestGetFileInfo_NotFound(t *testing.T) {
 }
 
 func TestGetFile_NotFound(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	_, err = fileService.GetFile("nonexistent_hash")
@@ -73,7 +79,7 @@ func TestCreateFile(t *testing.T) {
 	mockChecksum := "checksum123"
 	mockContent := []byte("file_content")
 
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.CreateFile(mockHash, mockChecksum, mockContent)
@@ -82,7 +88,7 @@ func TestCreateFile(t *testing.T) {
 }
 
 func TestCreateFile_Error(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.CreateFile("", "", nil)
@@ -92,7 +98,7 @@ func TestCreateFile_Error(t *testing.T) {
 func TestDeleteFile(t *testing.T) {
 	mockHash := "mockHash"
 
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.DeleteFile(mockHash)
@@ -101,7 +107,7 @@ func TestDeleteFile(t *testing.T) {
 }
 
 func TestDeleteFile_Error(t *testing.T) {
-	fileService, err := newFileService(testDir)
+	fileService, err := services.NewFileService(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.DeleteFile("")

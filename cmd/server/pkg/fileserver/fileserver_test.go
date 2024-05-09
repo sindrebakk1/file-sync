@@ -1,1 +1,1 @@
-package fileserver
+package fileserver_test

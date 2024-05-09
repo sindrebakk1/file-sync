@@ -104,7 +104,7 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 
 	// Compare the expected response with the received response.
 	var expectedResponse []byte
-	expectedResponse, err = calculateResponse(challenge, sharedKey)
+	expectedResponse, err = CalculateResponse(challenge, sharedKey)
 	if !bytes.Equal(expectedResponse, challengeResponse) {
 		// Send the authenticated message to the client.
 		authFailedMessage := models.Message{
@@ -170,8 +170,8 @@ func generateChallenge(length int) (challenge []byte, err error) {
 	return challenge, nil
 }
 
-// calculateResponse calculates the expected response to the challenge using the shared key.
-func calculateResponse(challenge []byte, sharedKey []byte) (response []byte, err error) {
+// CalculateResponse calculates the expected response to the challenge using the shared key.
+func CalculateResponse(challenge []byte, sharedKey []byte) (response []byte, err error) {
 	challengeBytes := make([]byte, base64.StdEncoding.DecodedLen(len(challenge)))
 	_, err = base64.StdEncoding.Decode(challengeBytes, challenge)
 	if err != nil {

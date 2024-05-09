@@ -44,7 +44,7 @@ func NewFileServiceFactory(baseDir string, fileCache cache.Cache, metaCache cach
 }
 
 func (f *concreteFileServiceFactory) NewFileService(dir string) (FileService, error) {
-	return newFileService(filepath.Join(f.baseDir, dir))
+	return NewFileService(filepath.Join(f.baseDir, dir))
 }
 
 type concreteFileService struct {
@@ -53,7 +53,7 @@ type concreteFileService struct {
 	mutexes       *sync.Map
 }
 
-func newFileService(baseDir string) (FileService, error) {
+func NewFileService(baseDir string) (FileService, error) {
 	fileMap, mutexes, err := initFileMap(baseDir)
 	if err != nil {
 		return nil, err

@@ -10,8 +10,6 @@
 
 _*
 
-/cmd/server/data
-
 # Test binary, built with `go test -c`
 *.test
 
@@ -20,9 +18,6 @@ _*
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-
-# Go workspace file
-go.work
 
 # Certificates
 *.pem

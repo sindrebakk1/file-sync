@@ -1,4 +1,5 @@
 cmd/client
 integration
 _*
+*_test.go
 .devcontainer

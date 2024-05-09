@@ -7,6 +7,7 @@ const (
 	Upload
 	Download
 	Delete
+	Chunk
 	List
 	Auth
 	Error
@@ -15,27 +16,27 @@ const (
 )
 
 func (a MessageType) String() string {
-	return [...]string{"Status", "Upload", "Download", "Delete", "List", "Auth", "Error", "Cancel", "Echo"}[a]
+	return [...]string{"Status", "Upload", "Download", "Delete", "Chunk", "List", "Auth", "Error", "Cancel", "Echo"}[a]
 }
 
 type Done uint8
 
 const (
-	No Done = iota
-	Yes
+	Yes Done = iota
+	No
 )
 
 func (d Done) String() string {
-	return [...]string{"No", "Yes"}[d]
+	return [...]string{"Yes", "No"}[d]
 }
 
 type Sender uint8
 
 const (
-	Client Sender = iota
-	Server
+	Server Sender = iota
+	Client
 )
 
 func (s Sender) String() string {
-	return [...]string{"Client", "Server"}[s]
+	return [...]string{"Server", "Client"}[s]
 }

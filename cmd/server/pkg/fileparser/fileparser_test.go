@@ -1,8 +1,9 @@
-package fileparser
+package fileparser_test
 
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"server/pkg/fileparser"
 	"strings"
 	"testing"
 )
@@ -14,7 +15,7 @@ var (
 )
 
 func TestParse(t *testing.T) {
-	checksum, blob, err := Parse([]byte(testContent))
+	checksum, blob, err := fileparser.Parse([]byte(testContent))
 
 	assert.NoError(t, err)
 	assert.Equal(t, testChecksum, checksum)
@@ -24,7 +25,7 @@ func TestParse(t *testing.T) {
 func TestParse_InvalidFormat(t *testing.T) {
 	content := []byte("invalidcontent")
 
-	_, _, err := Parse(content)
+	_, _, err := fileparser.Parse(content)
 
 	assert.Error(t, err)
 	assert.Equal(t, "invalid file format: missing newline separator", err.Error())
@@ -33,7 +34,7 @@ func TestParse_InvalidFormat(t *testing.T) {
 func TestParseFromReader(t *testing.T) {
 	reader := strings.NewReader(testContent)
 
-	checksum, blob, err := ParseFromReader(reader)
+	checksum, blob, err := fileparser.ParseFromReader(reader)
 
 	assert.NoError(t, err)
 	assert.Equal(t, testChecksum, checksum)
@@ -41,14 +42,14 @@ func TestParseFromReader(t *testing.T) {
 }
 
 func TestExtractChecksum(t *testing.T) {
-	checksum, err := ExtractChecksum([]byte(testContent))
+	checksum, err := fileparser.ExtractChecksum([]byte(testContent))
 
 	assert.NoError(t, err)
 	assert.Equal(t, testChecksum, checksum)
 }
 
 func TestExtractBlob(t *testing.T) {
-	blob, err := ExtractBlob([]byte(testContent))
+	blob, err := fileparser.ExtractBlob([]byte(testContent))
 
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(testBlob), blob)
@@ -57,7 +58,7 @@ func TestExtractBlob(t *testing.T) {
 func TestExtractChecksumFromReader(t *testing.T) {
 	reader := strings.NewReader(testContent)
 
-	checksum, err := ExtractChecksumFromReader(reader)
+	checksum, err := fileparser.ExtractChecksumFromReader(reader)
 
 	assert.NoError(t, err)
 	assert.Equal(t, testChecksum, checksum)
@@ -66,7 +67,7 @@ func TestExtractChecksumFromReader(t *testing.T) {
 func TestExtractBlobFromReader(t *testing.T) {
 	reader := strings.NewReader(testContent)
 
-	blob, err := ExtractBlobFromReader(reader)
+	blob, err := fileparser.ExtractBlobFromReader(reader)
 
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(testBlob), blob)

@@ -49,7 +49,9 @@ func main() {
 
 	// Initialize services.
 	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
+
 	userService = services.NewUserService(fileServiceFactory)
+
 	authConfig = &services.Config{
 		ChallengeLen: ChallengeLen,
 	}
@@ -57,12 +59,17 @@ func main() {
 
 	// Initialize the mux.
 	tcpMux := mux.NewMux(authService)
+
 	tcpMux.Handle(enums.Status, handlers.HandleStatus)
 	tcpMux.Handle(enums.Download, handlers.HandleDownload)
 	tcpMux.Handle(enums.Upload, handlers.HandleUpload)
 	tcpMux.Handle(enums.Delete, handlers.HandleDelete)
+	tcpMux.Handle(enums.Chunk, handlers.HandleChunk)
 	tcpMux.Handle(enums.List, handlers.HandleList)
-	tcpMux.Handle(enums.Echo, handlers.HandleEcho)
+
+	if Environment == enums.Development {
+		tcpMux.Handle(enums.Echo, handlers.HandleEcho)
+	}
 
 	// Load the TLS certificate.
 	var certDir string
@@ -91,6 +98,10 @@ func main() {
 }
 
 func init() {
+	// Configure environment variables.
+	viper.SetEnvPrefix(constants.AppName)
+	viper.AutomaticEnv()
+
 	// Set default values.
 	viper.SetDefault("env", enums.Development)
 	viper.SetDefault("port", 443)
@@ -103,10 +114,6 @@ func init() {
 	viper.SetDefault("auth.challenge.len", 32)
 	viper.SetDefault("log.level", log.DebugLevel)
 
-	// Configure environment variables.
-	viper.SetEnvPrefix(constants.AppName)
-	viper.AutomaticEnv()
-
 	Environment = enums.Environment(viper.GetString("env"))
 
 	// Set the configuration file name based on the environment.
@@ -117,7 +124,7 @@ func init() {
 	case enums.Development:
 		configName = "config.dev"
 	default:
-		panic(fmt.Errorf("invalid environment: %s", Environment))
+		log.Fatal(fmt.Errorf("invalid environment: %s", Environment))
 	}
 
 	// Set the configuration file name and path.
@@ -129,11 +136,11 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
-			panic(err)
+			log.Fatal(err)
 		}
 	}
 
-	// Bind environment variables to variables.
+	// Bind config values to variables.
 	Port = viper.GetInt("port")
 	FileCacheSize = viper.GetInt("cache.file.size")
 	MetaCacheSize = viper.GetInt("cache.meta.size")

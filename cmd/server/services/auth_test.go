@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	enums2 "file-sync/enums"
@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"server/pkg/cache"
+	"server/services"
 	"testing"
 )
 
@@ -18,9 +19,9 @@ const (
 )
 
 var (
-	userService        UserService
-	authConfig         *Config
-	fileServiceFactory FileServiceFactory
+	userService        services.UserService
+	authConfig         *services.Config
+	fileServiceFactory services.FileServiceFactory
 	listener           net.Listener
 
 	// Test users
@@ -33,9 +34,9 @@ var (
 func TestMain(m *testing.M) {
 	fileCache := cache.NewCache(100)
 	metaCache := cache.NewCache(100)
-	fileServiceFactory = NewFileServiceFactory(BaseDir, fileCache, metaCache)
-	userService = NewUserService(fileServiceFactory)
-	authConfig = &Config{
+	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
+	userService = services.NewUserService(fileServiceFactory)
+	authConfig = &services.Config{
 		ChallengeLen: ChallengeLen,
 	}
 
@@ -57,7 +58,7 @@ func TestAuthenticateClientNewUser(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthService(userService, authConfig)
+	authenticator := services.NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -73,7 +74,7 @@ func TestAuthenticateClientExistingUser(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthService(userService, authConfig)
+	authenticator := services.NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -89,7 +90,7 @@ func TestAuthenticateClientFailed(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthService(userService, authConfig)
+	authenticator := services.NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.Error(t, err, "Expected authentication error")
@@ -105,7 +106,7 @@ func TestAuthenticateClientNewUser2(t *testing.T) {
 	assert.NoError(t, err)
 	defer conn.Close()
 
-	authenticator := NewAuthService(userService, authConfig)
+	authenticator := services.NewAuthService(userService, authConfig)
 
 	err = authenticator.AuthenticateClient(conn)
 	assert.NoError(t, err, "Error authenticating client")
@@ -127,7 +128,7 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 
 	// Calculate the challenge response.
 	var challengeResponse []byte
-	challengeResponse, err = calculateResponse(challengeMessage.Body.([]byte), testSecret)
+	challengeResponse, err = services.CalculateResponse(challengeMessage.Body.([]byte), testSecret)
 	assert.NoError(t, err, "Error calculating response")
 
 	// Send the challenge response to the server.

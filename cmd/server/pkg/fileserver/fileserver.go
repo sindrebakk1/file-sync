@@ -42,7 +42,7 @@ func (s *concreteServer) ListenAndServe(port int) error {
 	for {
 		var conn net.Conn
 		conn, err = tlsListener.Accept()
-		log.Debugf("Accepted connection from %s, port: %d", conn.RemoteAddr().String(), conn.RemoteAddr().(*net.TCPAddr).Port)
+		log.Debugf("Accepted connection from %s", conn.RemoteAddr().String())
 		conn.RemoteAddr().String()
 		if err != nil {
 			var ne net.Error
@@ -55,14 +55,6 @@ func (s *concreteServer) ListenAndServe(port int) error {
 			}
 			return err
 		}
-
-		// Check if the accepted connection's local address port matches the intended port
-		if conn.RemoteAddr().(*net.TCPAddr).Port != port {
-			log.Debugf("Connection from unexpected port: %d, closing...", conn.LocalAddr().(*net.TCPAddr).Port)
-			conn.Close()
-			continue
-		}
-
 		go s.mux.ServeConn(conn)
 	}
 }

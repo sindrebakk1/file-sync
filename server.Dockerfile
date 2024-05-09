@@ -3,12 +3,20 @@ LABEL authors="Sindre"
 
 WORKDIR /src
 
-COPY . .
-RUN go work sync
+COPY go.work go.work.sum ./
+COPY ./cmd/server/go.* ./cmd/server/
+COPY ./cmd/client/go.* ./cmd/client/
+COPY ./pkg/constants/go.* ./pkg/constants/
+COPY ./pkg/enums/go.* ./pkg/enums/
+COPY ./pkg/models/go.* ./pkg/models/
+COPY ./pkg/integration/go.* ./pkg/integration/
+
+RUN go mod download -x
 
 FROM base AS build
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/server server
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/server -v server
 
 FROM scratch AS server
 

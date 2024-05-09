@@ -48,6 +48,7 @@ func (m *concreteMux) Shutdown() {
 }
 
 func (m *concreteMux) Handle(action enums.MessageType, handlerFunc HandlerFunc) {
+	log.Debugf("Registering handler for action %s", action)
 	m.handlers[action] = handlerFunc
 }
 
@@ -145,6 +146,7 @@ func handleResponses(conn net.Conn, ctx context.Context) chan models.Message {
 }
 
 func (m *concreteMux) handleRequest(resChan chan models.Message, req *Request, cancel context.CancelFunc) error {
+	log.Debugf("Handling request with action %s", req.Message.Header.Action)
 	handler, ok := m.handlers[req.Message.Header.Action]
 	if !ok {
 		return errors.New("unknown action")
@@ -157,6 +159,7 @@ func (m *concreteMux) handleRequest(resChan chan models.Message, req *Request, c
 	var transactionChan chan models.Message
 	transactionChan, ok = sessionData.GetTransaction(req.Message.Header.TransactionID)
 	if ok {
+		log.Debug("Transaction found for request, forwarding message to transaction channel")
 		transactionChan <- req.Message
 		return nil
 	}
