@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"file-sync/models"
+	"filesync/models"
 	log "github.com/sirupsen/logrus"
 	"server/pkg/mux"
 )

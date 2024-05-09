@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"file-sync/models"
+	"filesync/models"
 	"server/services"
 	"sync"
 )

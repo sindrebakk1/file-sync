@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"file-sync/enums"
-	"file-sync/models"
+	"filesync/enums"
+	"filesync/models"
 	"server/pkg/mux"
 )
 

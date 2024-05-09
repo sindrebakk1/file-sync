@@ -2,7 +2,7 @@ package services
 
 import (
 	"bytes"
-	"file-sync/models"
+	"filesync/models"
 	"fmt"
 	"io"
 	"os"

@@ -1,3 +1,3 @@
-module file-sync/integration_tests
+module filesync/integration
 
 go 1.22.1

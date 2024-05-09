@@ -1,3 +1,3 @@
-module file-sync/enums
+module filesync/enums
 
 go 1.22.1

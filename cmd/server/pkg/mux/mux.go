@@ -3,8 +3,8 @@ package mux
 import (
 	"context"
 	"errors"
-	"file-sync/enums"
-	"file-sync/models"
+	"filesync/enums"
+	"filesync/models"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"server/pkg/session"

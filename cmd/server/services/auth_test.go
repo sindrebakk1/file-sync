@@ -1,8 +1,8 @@
 package services_test
 
 import (
-	enums2 "file-sync/enums"
-	"file-sync/models"
+	"filesync/enums"
+	"filesync/models"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
@@ -135,7 +135,7 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 	challengeResponsePayload := append(challengeResponse, []byte(testUser)...)
 	challengeResponseMessage := models.Message{
 		Header: models.Header{
-			Action: enums2.Auth,
+			Action: enums.Auth,
 		},
 		Body: challengeResponsePayload,
 	}
@@ -147,16 +147,16 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 	_, err = authResponseMessage.Receive(conn)
 	assert.NoError(t, err)
 
-	result := enums2.AuthResult(authResponseMessage.Body.([]byte)[0])
+	result := enums.AuthResult(authResponseMessage.Body.([]byte)[0])
 	switch result {
-	case enums2.Authenticated:
+	case enums.Authenticated:
 		t.Logf("Client: Received authenticated message: %v\n", authResponseMessage)
-	case enums2.NewUser:
+	case enums.NewUser:
 		t.Logf("Client: Received new user message: %v\n", authResponseMessage)
 		// Send the shared key to the server.
 		secretMessage := models.Message{
 			Header: models.Header{
-				Action: enums2.Auth,
+				Action: enums.Auth,
 			},
 			Body: testSecret,
 		}
@@ -167,9 +167,9 @@ func testClient(t *testing.T, testUser string, testSecret []byte) {
 		_, err = responseMessage.Receive(conn)
 		assert.NoError(t, err, "Error receiving new user response message")
 		t.Logf("Client: Received authenticated message: %v\n", responseMessage)
-		result = enums2.AuthResult(responseMessage.Body.([]byte)[0])
-		assert.Equal(t, enums2.Authenticated, result, "Expected authenticated message, got %v", result)
-	case enums2.Unauthorized:
+		result = enums.AuthResult(responseMessage.Body.([]byte)[0])
+		assert.Equal(t, enums.Authenticated, result, "Expected authenticated message, got %v", result)
+	case enums.Unauthorized:
 		t.Logf("Client: Received authentication failed message: %v\n", authResponseMessage)
 	default:
 		t.Errorf("Client: Received unexpected message: %v\n", authResponseMessage)

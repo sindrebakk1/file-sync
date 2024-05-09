@@ -3,8 +3,8 @@ package main
 import (
 	"crypto/tls"
 	"errors"
-	"file-sync/constants"
-	"file-sync/enums"
+	"filesync/constants"
+	"filesync/enums"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"

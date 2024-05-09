@@ -6,8 +6,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	enums2 "file-sync/enums"
-	"file-sync/models"
+	"filesync/enums"
+	"filesync/models"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -50,8 +50,8 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 	}
 	challengeMessage := models.Message{
 		Header: models.Header{
-			Action: enums2.Auth,
-			Sender: enums2.Server,
+			Action: enums.Auth,
+			Sender: enums.Server,
 		},
 		Body: challenge,
 	}
@@ -80,10 +80,10 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 		log.Debugf("User %s not found, creating new user", userName)
 		newUserMessage := models.Message{
 			Header: models.Header{
-				Action: enums2.Auth,
-				Sender: enums2.Server,
+				Action: enums.Auth,
+				Sender: enums.Server,
 			},
-			Body: enums2.NewUser,
+			Body: enums.NewUser,
 		}
 		_, err = newUserMessage.Send(conn)
 		if err != nil {
@@ -109,10 +109,10 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 		// Send the authenticated message to the client.
 		authFailedMessage := models.Message{
 			Header: models.Header{
-				Action: enums2.Auth,
-				Sender: enums2.Server,
+				Action: enums.Auth,
+				Sender: enums.Server,
 			},
-			Body: enums2.Unauthorized,
+			Body: enums.Unauthorized,
 		}
 		_, err = authFailedMessage.Send(conn)
 		if err != nil {
@@ -125,10 +125,10 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 	// Send the authenticated message to the client.
 	authenticatedMessage := models.Message{
 		Header: models.Header{
-			Action: enums2.Auth,
-			Sender: enums2.Server,
+			Action: enums.Auth,
+			Sender: enums.Server,
 		},
-		Body: enums2.Authenticated,
+		Body: enums.Authenticated,
 	}
 	_, err = authenticatedMessage.Send(conn)
 	if err != nil {

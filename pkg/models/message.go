@@ -3,8 +3,8 @@ package models
 import (
 	"bytes"
 	"encoding/binary"
-	"file-sync/constants"
-	"file-sync/enums"
+	"filesync/constants"
+	"filesync/enums"
 	"fmt"
 	"io"
 	"net"
@@ -26,6 +26,14 @@ type Header struct {
 type Message struct {
 	Header Header
 	Body   interface{}
+}
+
+func NewMessage() *Message {
+	return &Message{
+		Header: Header{
+			Version: constants.Version,
+		},
+	}
 }
 
 // StatusRequest is the type of Message.Body for a Status request.
