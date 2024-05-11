@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net"
 	"server/pkg/session"
-	"server/services"
+	"server/services/auth"
 	"sync"
 	"time"
 )
@@ -28,12 +28,12 @@ type Mux interface {
 
 type concreteMux struct {
 	handlers      map[enums.MessageType]HandlerFunc
-	authenticator services.AuthService
+	authenticator auth.Service
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
 
-func NewMux(authenticator services.AuthService) Mux {
+func NewMux(authenticator auth.Service) Mux {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &concreteMux{
 		make(map[enums.MessageType]HandlerFunc),

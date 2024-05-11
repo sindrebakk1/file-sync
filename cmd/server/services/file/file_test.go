@@ -1,8 +1,10 @@
-package services_test
+package file_test
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/assert"
-	"server/services"
+	"os"
+	"server/services/file"
 	"testing"
 )
 
@@ -14,39 +16,30 @@ var (
 	testChecksum = "checksum123456789012345678901234"
 )
 
-// MockCache is a mock implementation of the cache.Cache interface for testing purposes.
-type MockCache struct{}
-
-func (c *MockCache) Get(key string) (interface{}, bool) {
-	return nil, false
-}
-
-func (c *MockCache) Set(key string, value interface{}) {
-}
-
-func (c *MockCache) Delete(key string) {
+func TestMain(m *testing.M) {
+	os.Exit(m.Run())
 }
 
 func TestNewFileServiceFactory(t *testing.T) {
-	fileCache := &MockCache{}
-	metaCache := &MockCache{}
+	fileCache := &mocks.MockCache{}
+	metaCache := &mocks.MockCache{}
 
-	factory := services.NewFileServiceFactory(testDir, fileCache, metaCache)
+	factory := file.NewFactory(testBaseDir, fileCache, metaCache)
 	assert.NotNil(t, factory)
 
-	fileService, err := factory.NewFileService(testUserDir)
+	fileService, err := factory.New(testUserDir)
 	assert.NoError(t, err)
 	assert.NotNil(t, fileService)
 }
 
 func TestNewFileService(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 	assert.NotNil(t, fileService)
 }
 
 func TestGetFileInfo(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	fileInfo, found := fileService.GetFileInfo(testHash)
@@ -56,7 +49,7 @@ func TestGetFileInfo(t *testing.T) {
 }
 
 func TestGetFileInfo_NotFound(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	fileInfo, found := fileService.GetFileInfo("nonexistent_hash")
@@ -64,8 +57,19 @@ func TestGetFileInfo_NotFound(t *testing.T) {
 	assert.Nil(t, fileInfo)
 }
 
+func TestGetFile(t *testing.T) {
+	fileService, err := file.New(testDir)
+	assert.NoError(t, err)
+
+	var file *bytes.Buffer
+	file, err = fileService.GetFile(testHash)
+	assert.NoError(t, err)
+	assert.NotNil(t, file)
+
+}
+
 func TestGetFile_NotFound(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	_, err = fileService.GetFile("nonexistent_hash")
@@ -79,7 +83,7 @@ func TestCreateFile(t *testing.T) {
 	mockChecksum := "checksum123"
 	mockContent := []byte("file_content")
 
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.CreateFile(mockHash, mockChecksum, mockContent)
@@ -88,7 +92,7 @@ func TestCreateFile(t *testing.T) {
 }
 
 func TestCreateFile_Error(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.CreateFile("", "", nil)
@@ -98,7 +102,7 @@ func TestCreateFile_Error(t *testing.T) {
 func TestDeleteFile(t *testing.T) {
 	mockHash := "mockHash"
 
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.DeleteFile(mockHash)
@@ -107,7 +111,7 @@ func TestDeleteFile(t *testing.T) {
 }
 
 func TestDeleteFile_Error(t *testing.T) {
-	fileService, err := services.NewFileService(testDir)
+	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
 	err = fileService.DeleteFile("")

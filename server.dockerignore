@@ -1,4 +1,4 @@
-cmd/client
+client
 integration
 _*
 *_test.go

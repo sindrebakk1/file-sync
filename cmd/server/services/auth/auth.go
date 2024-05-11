@@ -1,4 +1,4 @@
-package services
+package auth
 
 import (
 	"bytes"
@@ -11,11 +11,13 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"server/services/file"
+	"server/services/user"
 )
 
-type AuthService interface {
+type Service interface {
 	AuthenticateClient(net.Conn) error
-	GetFileService() (FileService, error)
+	GetFileService() (file.Service, error)
 	IsAuthenticated() bool
 	GetUsername() string
 }
@@ -24,15 +26,15 @@ type Config struct {
 	ChallengeLen int
 }
 
-type concreteAutService struct {
-	userService   UserService
+type concreteService struct {
+	userService   user.Service
 	config        *Config
 	authenticated bool
 	userName      string
 }
 
-func NewAuthService(userService UserService, config *Config) AuthService {
-	return &concreteAutService{
+func New(userService user.Service, config *Config) Service {
+	return &concreteService{
 		userService,
 		config,
 		false,
@@ -41,7 +43,7 @@ func NewAuthService(userService UserService, config *Config) AuthService {
 }
 
 // AuthenticateClient authenticates the client, creating a new user if necessary.
-func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
+func (a *concreteService) AuthenticateClient(conn net.Conn) (err error) {
 	var challenge []byte
 	challenge, err = generateChallenge(a.config.ChallengeLen)
 	log.Debugf("Generated challenge: %s", challenge)
@@ -143,18 +145,18 @@ func (a *concreteAutService) AuthenticateClient(conn net.Conn) (err error) {
 }
 
 // GetFileService returns the file service of the authenticated user.
-func (a *concreteAutService) GetFileService() (FileService, error) {
+func (a *concreteService) GetFileService() (file.Service, error) {
 	if !a.authenticated {
 		return nil, fmt.Errorf("not authenticated")
 	}
 	return a.userService.GetFileService(a.userName)
 }
 
-func (a *concreteAutService) IsAuthenticated() bool {
+func (a *concreteService) IsAuthenticated() bool {
 	return a.authenticated
 }
 
-func (a *concreteAutService) GetUsername() string {
+func (a *concreteService) GetUsername() string {
 	return a.userName
 }
 

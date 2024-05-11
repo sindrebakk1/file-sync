@@ -13,7 +13,9 @@ import (
 	"server/pkg/fileserver"
 	"server/pkg/handlers"
 	"server/pkg/mux"
-	"server/services"
+	"server/services/auth"
+	"server/services/file"
+	"server/services/user"
 )
 
 var (
@@ -33,13 +35,13 @@ func main() {
 	log.Info("Starting server...")
 	var (
 		server             fileserver.Server
-		userService        services.UserService
-		fileServiceFactory services.FileServiceFactory
+		userService        user.Service
+		fileServiceFactory file.Factory
 		fileCache          cache.Cache
 		metaCache          cache.Cache
 		cert               tls.Certificate
 		tlsConfig          *tls.Config
-		authConfig         *services.Config
+		authConfig         *auth.Config
 		err                error
 	)
 
@@ -48,14 +50,14 @@ func main() {
 	metaCache = cache.NewCache(MetaCacheSize)
 
 	// Initialize services.
-	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
+	fileServiceFactory = file.NewFactory(BaseDir, fileCache, metaCache)
 
-	userService = services.NewUserService(fileServiceFactory)
+	userService = user.New(fileServiceFactory)
 
-	authConfig = &services.Config{
+	authConfig = &auth.Config{
 		ChallengeLen: ChallengeLen,
 	}
-	authService := services.NewAuthService(userService, authConfig)
+	authService := auth.New(userService, authConfig)
 
 	// Initialize the mux.
 	tcpMux := mux.NewMux(authService)

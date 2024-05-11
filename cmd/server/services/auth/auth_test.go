@@ -1,28 +1,29 @@
-package services_test
+package auth_test
 
 import (
 	"filesync/enums"
 	"filesync/models"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"os"
 	"server/pkg/cache"
-	"server/services"
+	"server/services/auth"
+	"server/services/file"
+	"server/services/user"
 	"testing"
 )
 
 const (
 	BaseDir      = "test"
 	ChallengeLen = 32
-	Port         = 5000
 )
 
 var (
-	userService        services.UserService
-	authConfig         *services.Config
-	fileServiceFactory services.FileServiceFactory
-	listener           net.Listener
+	userService        user.Service
+	authConfig         *auth.Config
+	fileServiceFactory file.Factory
+	client             net.Conn
+	server             net.Conn
 
 	// Test users
 	testUser1   = "test1"
@@ -34,33 +35,28 @@ var (
 func TestMain(m *testing.M) {
 	fileCache := cache.NewCache(100)
 	metaCache := cache.NewCache(100)
-	fileServiceFactory = services.NewFileServiceFactory(BaseDir, fileCache, metaCache)
-	userService = services.NewUserService(fileServiceFactory)
-	authConfig = &services.Config{
+	fileServiceFactory = file.NewFactory(BaseDir, fileCache, metaCache)
+	userService = user.New(fileServiceFactory)
+	authConfig = &auth.Config{
 		ChallengeLen: ChallengeLen,
 	}
 
-	var err error
-	listener, err = net.Listen("tcp", fmt.Sprintf(":%d", Port))
-	if err != nil {
-		panic(err)
-	}
-	defer listener.Close()
+	client, server = net.Pipe()
+	defer func() {
+		client.Close()
+		server.Close()
+	}()
 
 	os.Exit(m.Run())
 }
 
 // TestAuthenticateClientNewUser tests the authentication of a new user.
 func TestAuthenticateClientNewUser(t *testing.T) {
-	go testClient(t, testUser1, testSecret1)
+	go testClient(client, t, testUser1, testSecret1)
 
-	conn, err := listener.Accept()
-	assert.NoError(t, err)
-	defer conn.Close()
+	authenticator := auth.New(userService, authConfig)
 
-	authenticator := services.NewAuthService(userService, authConfig)
-
-	err = authenticator.AuthenticateClient(conn)
+	err := authenticator.AuthenticateClient(server)
 	assert.NoError(t, err, "Error authenticating client")
 	assert.True(t, authenticator.IsAuthenticated(), "Expected authenticated to be true")
 	assert.Equal(t, testUser1, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUsername())
@@ -68,15 +64,11 @@ func TestAuthenticateClientNewUser(t *testing.T) {
 
 // TestAuthenticateClientExistingUser tests the authentication of an existing user.
 func TestAuthenticateClientExistingUser(t *testing.T) {
-	go testClient(t, testUser1, testSecret1)
+	go testClient(client, t, testUser1, testSecret1)
 
-	conn, err := listener.Accept()
-	assert.NoError(t, err)
-	defer conn.Close()
+	authenticator := auth.New(userService, authConfig)
 
-	authenticator := services.NewAuthService(userService, authConfig)
-
-	err = authenticator.AuthenticateClient(conn)
+	err := authenticator.AuthenticateClient(server)
 	assert.NoError(t, err, "Error authenticating client")
 	assert.True(t, authenticator.IsAuthenticated(), "Expected authenticated to be true")
 	assert.Equal(t, testUser1, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser1, authenticator.GetUsername())
@@ -84,15 +76,11 @@ func TestAuthenticateClientExistingUser(t *testing.T) {
 
 // TestAuthenticateClientFailed tests the authentication of a client with an incorrect secret.
 func TestAuthenticateClientFailed(t *testing.T) {
-	go testClient(t, testUser1, testSecret2)
+	go testClient(client, t, testUser1, testSecret2)
 
-	conn, err := listener.Accept()
-	assert.NoError(t, err)
-	defer conn.Close()
+	authenticator := auth.New(userService, authConfig)
 
-	authenticator := services.NewAuthService(userService, authConfig)
-
-	err = authenticator.AuthenticateClient(conn)
+	err := authenticator.AuthenticateClient(server)
 	assert.Error(t, err, "Expected authentication error")
 	assert.False(t, authenticator.IsAuthenticated(), "Expected authenticated to be false")
 	assert.Equal(t, "", authenticator.GetUsername(), "Expected user name to be empty, got %s", authenticator.GetUsername())
@@ -100,15 +88,11 @@ func TestAuthenticateClientFailed(t *testing.T) {
 
 // TestAuthenticateClientNewUser2 tests the authentication of a new user.
 func TestAuthenticateClientNewUser2(t *testing.T) {
-	go testClient(t, testUser2, testSecret2)
+	go testClient(client, t, testUser2, testSecret2)
 
-	conn, err := listener.Accept()
-	assert.NoError(t, err)
-	defer conn.Close()
+	authenticator := auth.New(userService, authConfig)
 
-	authenticator := services.NewAuthService(userService, authConfig)
-
-	err = authenticator.AuthenticateClient(conn)
+	err := authenticator.AuthenticateClient(server)
 	assert.NoError(t, err, "Error authenticating client")
 	assert.Equal(t, testUser2, authenticator.GetUsername(), "Expected user name to be %s, got %s", testUser2, authenticator.GetUsername())
 
@@ -117,18 +101,15 @@ func TestAuthenticateClientNewUser2(t *testing.T) {
 	assert.Equal(t, testSecret2, secret, "Expected shared key to be %v, got %v", testSecret2, secret)
 }
 
-func testClient(t *testing.T, testUser string, testSecret []byte) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", Port))
-	assert.NoError(t, err)
-	defer conn.Close()
-
+func testClient(conn net.Conn, t *testing.T, testUser string, testSecret []byte) {
 	var challengeMessage models.Message
+	var err error
 	_, err = challengeMessage.Receive(conn)
 	assert.NoError(t, err, "Error receiving challenge message")
 
 	// Calculate the challenge response.
 	var challengeResponse []byte
-	challengeResponse, err = services.CalculateResponse(challengeMessage.Body.([]byte), testSecret)
+	challengeResponse, err = auth.CalculateResponse(challengeMessage.Body.([]byte), testSecret)
 	assert.NoError(t, err, "Error calculating response")
 
 	// Send the challenge response to the server.

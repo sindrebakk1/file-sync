@@ -3,14 +3,14 @@ package session
 import (
 	"context"
 	"filesync/models"
-	"server/services"
+	"server/services/file"
 	"sync"
 )
 
 type Session struct {
 	Username     string
 	Transactions *sync.Map
-	FileService  services.FileService
+	FileService  file.Service
 }
 
 func NewContext(ctx context.Context, session *Session) (context.Context, context.CancelFunc) {

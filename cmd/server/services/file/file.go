@@ -1,4 +1,4 @@
-package services
+package file
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-type FileService interface {
+type Service interface {
 	// GetFileInfo returns the file with the given TransactionID.
 	GetFileInfo(hash string) (fileInfo *models.FileInfoBytes, found bool)
 	// GetFile returns a file reader for the file with the given TransactionID.
@@ -25,52 +25,52 @@ type FileService interface {
 	GetFileMap() map[string]*models.FileInfoBytes
 }
 
-type FileServiceFactory interface {
-	NewFileService(dir string) (FileService, error)
+type Factory interface {
+	New(dir string) (Service, error)
 }
 
-type concreteFileServiceFactory struct {
+type concreteFactory struct {
 	baseDir   string
 	fileCache cache.Cache
 	metaCache cache.Cache
 }
 
-func NewFileServiceFactory(baseDir string, fileCache cache.Cache, metaCache cache.Cache) FileServiceFactory {
-	return &concreteFileServiceFactory{
+func NewFactory(baseDir string, fileCache cache.Cache, metaCache cache.Cache) Factory {
+	return &concreteFactory{
 		baseDir,
 		fileCache,
 		metaCache,
 	}
 }
 
-func (f *concreteFileServiceFactory) NewFileService(dir string) (FileService, error) {
-	return NewFileService(filepath.Join(f.baseDir, dir))
+func (f *concreteFactory) New(userDir string) (Service, error) {
+	return New(filepath.Join(f.baseDir, userDir))
 }
 
-type concreteFileService struct {
-	baseDir       string
+type concreteService struct {
+	dir           string
 	syncedFileMap map[string]*models.FileInfoBytes
 	mutexes       *sync.Map
 }
 
-func NewFileService(baseDir string) (FileService, error) {
-	fileMap, mutexes, err := initFileMap(baseDir)
+func New(dir string) (Service, error) {
+	fileMap, mutexes, err := initFileMap(dir)
 	if err != nil {
 		return nil, err
 	}
-	return &concreteFileService{
-		baseDir,
+	return &concreteService{
+		dir,
 		fileMap,
 		mutexes,
 	}, nil
 }
 
-func (s *concreteFileService) GetFileInfo(hash string) (fileInfo *models.FileInfoBytes, found bool) {
+func (s *concreteService) GetFileInfo(hash string) (fileInfo *models.FileInfoBytes, found bool) {
 	fileInfo, found = s.syncedFileMap[hash]
 	return fileInfo, found
 }
 
-func (s *concreteFileService) GetFile(hash string) (fileBuffer *bytes.Buffer, err error) {
+func (s *concreteService) GetFile(hash string) (fileBuffer *bytes.Buffer, err error) {
 	syncedFile, found := s.syncedFileMap[hash]
 	if !found {
 		return nil, fmt.Errorf("file not found")
@@ -83,7 +83,7 @@ func (s *concreteFileService) GetFile(hash string) (fileBuffer *bytes.Buffer, er
 
 	// Open the file
 	var file *os.File
-	file, err = os.Open(filepath.Join(s.baseDir, hash))
+	file, err = os.Open(filepath.Join(s.dir, hash))
 	if err != nil {
 		return nil, err
 	}
@@ -105,13 +105,13 @@ func (s *concreteFileService) GetFile(hash string) (fileBuffer *bytes.Buffer, er
 	return &buffer, nil
 }
 
-func (s *concreteFileService) CreateFile(hash string, checksum string, stream []byte) (err error) {
+func (s *concreteService) CreateFile(hash string, checksum string, stream []byte) (err error) {
 	mutex, _ := s.mutexes.LoadOrStore(hash, &sync.Mutex{})
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
 	var file *os.File
-	file, err = os.Create(filepath.Join(s.baseDir, hash))
+	file, err = os.Create(filepath.Join(s.dir, hash))
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (s *concreteFileService) CreateFile(hash string, checksum string, stream []
 	return nil
 }
 
-func (s *concreteFileService) DeleteFile(hash string) (err error) {
+func (s *concreteService) DeleteFile(hash string) (err error) {
 	mutex, _ := s.mutexes.Load(hash)
 	mutex.(*sync.Mutex).Lock()
 	defer func(mutex *sync.Mutex) {
@@ -143,7 +143,7 @@ func (s *concreteFileService) DeleteFile(hash string) (err error) {
 		s.mutexes.Delete(hash)
 	}(mutex.(*sync.Mutex))
 
-	err = os.Remove(filepath.Join(s.baseDir, hash))
+	err = os.Remove(filepath.Join(s.dir, hash))
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (s *concreteFileService) DeleteFile(hash string) (err error) {
 	return nil
 }
 
-func (s *concreteFileService) GetFileMap() map[string]*models.FileInfoBytes {
+func (s *concreteService) GetFileMap() map[string]*models.FileInfoBytes {
 	return s.syncedFileMap
 }
 
@@ -163,8 +163,14 @@ func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mute
 		return nil, nil, err
 	}
 	normalizedBaseDir = filepath.Clean(normalizedBaseDir)
-	if err != nil {
-		return nil, nil, err
+
+	// Check if the directory exists
+	_, err = os.Stat(normalizedBaseDir)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(normalizedBaseDir, os.ModePerm)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	fileMap = make(map[string]*models.FileInfoBytes)
