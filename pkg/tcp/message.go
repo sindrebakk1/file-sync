@@ -14,6 +14,8 @@ const (
 	V1 Version = 1
 )
 
+const CurrentVersion = V1
+
 type Flag uint8
 
 const (

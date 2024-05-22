@@ -59,13 +59,13 @@ func (e *Encoder) Encode(m *Message) error {
 	if err != nil {
 		return err
 	}
+	m.Header.Version = CurrentVersion
 	m.Header.Type = typeID
 	m.Header.Length = Length(bodyLength)
 	msgBytes, err = e.EncodeHeader(&m.Header)
 	if err != nil {
 		return err
 	}
-	e.buf.Reset()
 	msgBytes = append(msgBytes, bodyBuf...)
 	_, err = e.writer.Write(msgBytes)
 	return err
@@ -199,9 +199,7 @@ func (e *Encoder) encodeArrayOrSlice(value interface{}) error {
 }
 
 func (e *Encoder) encodeStruct(val interface{}) error {
-	// validate that val is a struct
 	v := reflect.ValueOf(val)
-
 	for i := 0; i < v.NumField(); i++ {
 		fieldVal := v.Field(i)
 		fieldType := v.Type().Field(i)

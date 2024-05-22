@@ -12,7 +12,6 @@ func TestEncodeDecodeMessage_String(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -23,7 +22,6 @@ func TestEncodeDecodeMessage_String(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -34,7 +32,6 @@ func TestEncodeDecodeMessage_String(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -45,7 +42,6 @@ func TestEncodeDecodeMessage_String(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -56,7 +52,6 @@ func TestEncodeDecodeMessage_String(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -73,7 +68,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -84,7 +78,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -95,7 +88,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -106,7 +98,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -117,7 +108,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -128,7 +118,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -139,7 +128,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -150,7 +138,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -161,7 +148,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -172,7 +158,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -183,7 +168,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -194,7 +178,6 @@ func TestEncodeDecodeMessage_Numbers(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -211,7 +194,6 @@ func TestEncodeDecodeMessage_Boolean(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -222,7 +204,6 @@ func TestEncodeDecodeMessage_Boolean(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -245,7 +226,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -256,7 +236,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -267,7 +246,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -278,7 +256,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -289,7 +266,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -300,7 +276,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -311,7 +286,6 @@ func TestEncodeDecodeMessage_Slice(t *testing.T) {
 		{
 			value: tcp.Message{
 				Header: tcp.Header{
-					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 				},
@@ -426,6 +400,7 @@ func TestEncodeDecodeMessage_Struct(t *testing.T) {
 			},
 			expected: tcp.Message{
 				Header: tcp.Header{
+					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					Type:          testStructEmbeddedPrivateStruct3ID,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
@@ -455,10 +430,11 @@ func TestEncodeDecodeMessage_Struct(t *testing.T) {
 			},
 			expected: tcp.Message{
 				Header: tcp.Header{
+					Version:       tcp.V1,
 					Flags:         tcp.FError | tcp.FHuff,
 					Type:          testStructPrivateFields3ID,
 					TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
-					Length:        0x0,
+					Length:        0,
 				},
 				Body: testStructPrivateFields3{},
 			},

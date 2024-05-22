@@ -51,8 +51,8 @@ func (d *Decoder) Decode(msg *Message) error {
 	body, err = d.DecodeBody(header.Type, uint16(header.Length))
 	if err != nil {
 		return err
-
 	}
+	d.buf.Reset()
 	msg.Header = *header
 	msg.Body = body
 	return nil
@@ -78,6 +78,9 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 	if version, err = d.decodeUint8(reflect.ValueOf(version)); err != nil {
 		return nil, err
 	}
+	if Version(version) != CurrentVersion {
+		return nil, errors.New("unsupported version")
+	}
 	if flags, err = d.decodeUint8(reflect.ValueOf(flags)); err != nil {
 		return nil, err
 	}
@@ -89,7 +92,7 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 		return nil, err
 	}
 	if tn != TransactionIDSize {
-		return nil, errors.New("unexpected end of message")
+		return nil, errors.New("unexpected end of transaction ID")
 	}
 	if length, err = d.decodeUint16(reflect.ValueOf(length)); err != nil {
 		return nil, err
@@ -112,7 +115,7 @@ func (d *Decoder) DecodeBody(typeID TypeID, length uint16) (interface{}, error) 
 
 	}
 	if n != int64(length) {
-		return nil, errors.New("unexpected end of message")
+		return nil, errors.New("unexpected end of body")
 	}
 	var typ reflect.Type
 	typ, err = GetTypeFromID(typeID)
@@ -271,16 +274,17 @@ func (d *Decoder) decodeStruct(v reflect.Value) (interface{}, error) {
 	for i := 0; i < msgType.NumField(); i++ {
 		fieldVal := v.Field(i)
 		fieldType := msgType.Field(i)
-		if fieldType.IsExported() {
-			fieldKind := fieldVal.Kind()
-			field := structValue.Field(i)
-			newFieldValue, err := d.primitiveDecoders[fieldKind](d, field)
-			if err != nil {
-				return nil, err
-			}
-			if field.IsValid() && field.CanSet() {
-				field.Set(reflect.ValueOf(newFieldValue))
-			}
+		if !fieldType.IsExported() {
+			continue
+		}
+		fieldKind := fieldVal.Kind()
+		field := structValue.Field(i)
+		newFieldValue, err := d.primitiveDecoders[fieldKind](d, field)
+		if err != nil {
+			return nil, err
+		}
+		if field.IsValid() && field.CanSet() {
+			field.Set(reflect.ValueOf(newFieldValue))
 		}
 	}
 
