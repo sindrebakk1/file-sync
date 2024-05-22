@@ -5,6 +5,7 @@ import (
 	"filesync/models"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"server/pkg/cache"
@@ -77,7 +78,7 @@ func (s *concreteService) GetFile(hash string) (fileBuffer *bytes.Buffer, err er
 	}
 
 	// Lock the file
-	mutex, _ := s.mutexes.Load(syncedFile.GetHash())
+	mutex, _ := s.mutexes.LoadOrStore(syncedFile.GetHash(), &sync.Mutex{})
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
@@ -124,6 +125,10 @@ func (s *concreteService) CreateFile(hash string, checksum string, stream []byte
 	if err != nil {
 		return err
 	}
+	_, err = file.Write([]byte("\n"))
+	if err != nil {
+		return err
+	}
 
 	var fileInfo os.FileInfo
 	fileInfo, err = file.Stat()
@@ -136,12 +141,22 @@ func (s *concreteService) CreateFile(hash string, checksum string, stream []byte
 }
 
 func (s *concreteService) DeleteFile(hash string) (err error) {
-	mutex, _ := s.mutexes.Load(hash)
+	mutex, _ := s.mutexes.LoadOrStore(hash, &sync.Mutex{})
 	mutex.(*sync.Mutex).Lock()
 	defer func(mutex *sync.Mutex) {
 		mutex.Unlock()
 		s.mutexes.Delete(hash)
 	}(mutex.(*sync.Mutex))
+
+	var info os.FileInfo
+	info, err = os.Stat(filepath.Join(s.dir, hash))
+	if os.IsNotExist(err) {
+		return fmt.Errorf("file not found")
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("file is a directory")
+	}
 
 	err = os.Remove(filepath.Join(s.dir, hash))
 	if err != nil {
@@ -164,7 +179,6 @@ func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mute
 	}
 	normalizedBaseDir = filepath.Clean(normalizedBaseDir)
 
-	// Check if the directory exists
 	_, err = os.Stat(normalizedBaseDir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(normalizedBaseDir, os.ModePerm)
@@ -176,9 +190,13 @@ func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mute
 	fileMap = make(map[string]*models.FileInfoBytes)
 	mutexes = &sync.Map{}
 
-	err = filepath.Walk(normalizedBaseDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(normalizedBaseDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if info.IsDir() {
+			// Skip directories
+			return nil
 		}
 
 		mutex, _ := mutexes.LoadOrStore(info.Name(), &sync.Mutex{})
@@ -204,7 +222,7 @@ func initFileMap(baseDir string) (fileMap map[string]*models.FileInfoBytes, mute
 			return err
 		}
 
-		fileMap[info.Name()] = models.NewFileInfoBytes(info.Name(), string(checksum), fileInfo.ModTime())
+		fileMap[info.Name()] = models.NewFileInfoBytes(info.Name(), checksum, fileInfo.ModTime())
 		return nil
 	})
 	if err != nil {

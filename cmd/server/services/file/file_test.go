@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"server/pkg/_mocks"
 	"server/services/file"
 	"testing"
 )
@@ -14,15 +15,30 @@ var (
 	testDir      = testBaseDir + "/" + testUserDir
 	testHash     = "hash123"
 	testChecksum = "checksum123456789012345678901234"
+	testContent  = []byte("file_content")
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	code := m.Run()
+
+	// Clean up
+	err := os.RemoveAll(testDir)
+	if err != nil {
+		panic(err)
+	}
+
+	os.Exit(code)
+}
+
+func TestNewFileService(t *testing.T) {
+	fileService, err := file.New(testDir)
+	assert.NoError(t, err)
+	assert.NotNil(t, fileService)
 }
 
 func TestNewFileServiceFactory(t *testing.T) {
-	fileCache := &mocks.MockCache{}
-	metaCache := &mocks.MockCache{}
+	fileCache := &_mocks.MockCache{}
+	metaCache := &_mocks.MockCache{}
 
 	factory := file.NewFactory(testBaseDir, fileCache, metaCache)
 	assert.NotNil(t, factory)
@@ -32,10 +48,13 @@ func TestNewFileServiceFactory(t *testing.T) {
 	assert.NotNil(t, fileService)
 }
 
-func TestNewFileService(t *testing.T) {
+func TestCreateFile(t *testing.T) {
 	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
-	assert.NotNil(t, fileService)
+
+	err = fileService.CreateFile(testHash, testChecksum, testContent)
+	assert.NoError(t, err)
+	assert.Equal(t, testChecksum, fileService.GetFileMap()[testHash].GetChecksum())
 }
 
 func TestGetFileInfo(t *testing.T) {
@@ -61,11 +80,10 @@ func TestGetFile(t *testing.T) {
 	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
-	var file *bytes.Buffer
-	file, err = fileService.GetFile(testHash)
+	var fileBuf *bytes.Buffer
+	fileBuf, err = fileService.GetFile(testHash)
 	assert.NoError(t, err)
-	assert.NotNil(t, file)
-
+	assert.NotNil(t, fileBuf)
 }
 
 func TestGetFile_NotFound(t *testing.T) {
@@ -77,20 +95,6 @@ func TestGetFile_NotFound(t *testing.T) {
 	assert.Equal(t, "file not found", err.Error())
 }
 
-func TestCreateFile(t *testing.T) {
-	// Mocking file content and behavior
-	mockHash := "mockHash"
-	mockChecksum := "checksum123"
-	mockContent := []byte("file_content")
-
-	fileService, err := file.New(testDir)
-	assert.NoError(t, err)
-
-	err = fileService.CreateFile(mockHash, mockChecksum, mockContent)
-	assert.NoError(t, err)
-	assert.Equal(t, mockChecksum, fileService.GetFileMap()[mockHash].GetChecksum())
-}
-
 func TestCreateFile_Error(t *testing.T) {
 	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
@@ -100,14 +104,12 @@ func TestCreateFile_Error(t *testing.T) {
 }
 
 func TestDeleteFile(t *testing.T) {
-	mockHash := "mockHash"
-
 	fileService, err := file.New(testDir)
 	assert.NoError(t, err)
 
-	err = fileService.DeleteFile(mockHash)
+	err = fileService.DeleteFile(testHash)
 	assert.NoError(t, err)
-	assert.Nil(t, fileService.GetFileMap()[mockHash])
+	assert.Nil(t, fileService.GetFileMap()[testHash])
 }
 
 func TestDeleteFile_Error(t *testing.T) {

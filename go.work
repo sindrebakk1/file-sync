@@ -7,4 +7,5 @@ use (
 	pkg/enums
 	pkg/integration
 	pkg/models
+	pkg/tcp
 )
