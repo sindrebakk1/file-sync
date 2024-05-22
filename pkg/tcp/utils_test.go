@@ -16,10 +16,10 @@ type testCase struct {
 func encodeTestHeader(header *tcp.Header) []byte {
 	headerBytes := make([]byte, tcp.HeaderSize)
 	headerBytes[0] = byte(header.Version)
-	binary.BigEndian.PutUint16(headerBytes[1:], uint16(header.Flags))
-	binary.BigEndian.PutUint16(headerBytes[3:], uint16(header.Type))
-	copy(headerBytes[5:], header.TransactionID[:])
-	binary.BigEndian.PutUint16(headerBytes[37:], uint16(header.Length))
+	headerBytes[tcp.VersionSize] = byte(header.Flags)
+	binary.BigEndian.PutUint16(headerBytes[tcp.VersionSize+tcp.FlagsSize:], uint16(header.Type))
+	copy(headerBytes[tcp.VersionSize+tcp.FlagsSize+tcp.TypeIDSize:], header.TransactionID[:])
+	binary.BigEndian.PutUint16(headerBytes[tcp.VersionSize+tcp.FlagsSize+tcp.TypeIDSize+tcp.TransactionIDSize:], uint16(header.Length))
 
 	return headerBytes
 }

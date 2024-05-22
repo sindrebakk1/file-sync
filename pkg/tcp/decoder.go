@@ -70,15 +70,15 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 	}
 	var (
 		version uint8
-		flags   uint16
+		flags   uint8
 		typeID  uint16
-		transID [32]byte
+		transID [TransactionIDSize]byte
 		length  uint16
 	)
 	if version, err = d.decodeUint8(reflect.ValueOf(version)); err != nil {
 		return nil, err
 	}
-	if flags, err = d.decodeUint16(reflect.ValueOf(flags)); err != nil {
+	if flags, err = d.decodeUint8(reflect.ValueOf(flags)); err != nil {
 		return nil, err
 	}
 	if typeID, err = d.decodeUint16(reflect.ValueOf(typeID)); err != nil {
@@ -88,7 +88,7 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 	if tn, err = d.buf.Read(transID[:]); err != nil {
 		return nil, err
 	}
-	if tn != 32 {
+	if tn != TransactionIDSize {
 		return nil, errors.New("unexpected end of message")
 	}
 	if length, err = d.decodeUint16(reflect.ValueOf(length)); err != nil {
@@ -96,7 +96,7 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 	}
 
 	header.Version = Version(version)
-	header.Flags = Flags(flags)
+	header.Flags = Flag(flags)
 	header.Type = TypeID(typeID)
 	header.TransactionID = transID
 	header.Length = Length(length)

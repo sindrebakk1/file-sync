@@ -19,9 +19,9 @@ func TestEncodeHeader(t *testing.T) {
 
 	header := tcp.Header{
 		Version:       tcp.V1,
-		Flags:         tcp.FlagError | tcp.FlagHuffman,
+		Flags:         tcp.FError | tcp.FHuff,
 		Type:          1,
-		TransactionID: tcp.TransactionID(make([]byte, 32)),
+		TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 		Length:        5,
 	}
 
@@ -147,9 +147,8 @@ func TestEncodeMessage_String(t *testing.T) {
 	client, server := net.Pipe()
 	message := &tcp.Message{
 		Header: tcp.Header{
-			Version:       tcp.V1,
-			Flags:         tcp.FlagError | tcp.FlagHuffman,
-			TransactionID: tcp.TransactionID(make([]byte, 32)),
+			Flags:         tcp.FError | tcp.FHuff,
+			TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 		},
 		Body: "Hello",
 	}
@@ -159,7 +158,7 @@ func TestEncodeMessage_String(t *testing.T) {
 		assert.NoError(t, err)
 		server.Close()
 	}()
-	bytes := make([]byte, 46)
+	bytes := make([]byte, 29)
 	_, err := client.Read(bytes)
 	assert.NoError(t, err)
 	expected := encodeTestHeader(&message.Header)
@@ -169,7 +168,6 @@ func TestEncodeMessage_String(t *testing.T) {
 	}
 	expected = append(expected, b...)
 	assert.Equal(t, expected, bytes)
-	client.Close()
 }
 
 func testEncodeBody(t *testing.T, testCases []testCase) {
