@@ -87,12 +87,16 @@ func (d *Decoder) DecodeHeader() (*Header, error) {
 	if typeID, err = d.decodeUint16(reflect.ValueOf(typeID)); err != nil {
 		return nil, err
 	}
-	var tn int
-	if tn, err = d.buf.Read(transID[:]); err != nil {
-		return nil, err
-	}
-	if tn != TransactionIDSize {
-		return nil, errors.New("unexpected end of transaction ID")
+	if (Flag(flags) & FTransactionID) == FTransactionID {
+		tIDReader := io.LimitReader(d.reader, TransactionIDSize)
+		n, err = io.Copy(d.buf, tIDReader)
+		var tn int
+		if tn, err = d.buf.Read(transID[:]); err != nil {
+			return nil, err
+		}
+		if tn != TransactionIDSize {
+			return nil, errors.New("unexpected end of transaction ID")
+		}
 	}
 	if length, err = d.decodeUint16(reflect.ValueOf(length)); err != nil {
 		return nil, err
@@ -122,7 +126,9 @@ func (d *Decoder) DecodeBody(typeID TypeID, length uint16) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-
+	if typ == nil {
+		return nil, nil
+	}
 	val := reflect.New(typ).Elem()
 	if err = d.decodeValue(val); err != nil {
 		return nil, err
@@ -235,16 +241,7 @@ func (d *Decoder) decodeString(v reflect.Value) (string, error) {
 func (d *Decoder) decodeArrayOrSlice(v reflect.Value) (interface{}, error) {
 	t := v.Type()
 	elType := t.Elem()
-	elTypeID, err := GetIDFromTypeValue(elType)
-	if err != nil {
-		return nil, err
-	}
-	_, exists := reverseRegistry[elTypeID]
-	if !exists {
-		return nil, errors.New("type not registered")
-	}
-	var length uint32
-	length, err = d.decodeUint32(v)
+	length, err := d.decodeUint32(v)
 	if err != nil {
 		return nil, err
 	}

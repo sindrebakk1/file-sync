@@ -14,7 +14,7 @@ type testCase struct {
 }
 
 func encodeTestHeader(header *tcp.Header) []byte {
-	headerBytes := make([]byte, tcp.HeaderSize)
+	headerBytes := make([]byte, tcp.HeaderSizeWithTransactionID)
 	headerBytes[0] = byte(header.Version)
 	headerBytes[tcp.VersionSize] = byte(header.Flags)
 	binary.BigEndian.PutUint16(headerBytes[tcp.VersionSize+tcp.FlagsSize:], uint16(header.Type))

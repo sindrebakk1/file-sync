@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
 )
@@ -55,6 +56,9 @@ func (e *Encoder) Encode(m *Message) error {
 		return err
 	}
 	e.buf.Reset()
+	if bodyLength > MaxMessageBodySize {
+		return errors.New(fmt.Sprintf("message body too large. length: %d max: %d", bodyLength, MaxMessageBodySize))
+	}
 	typeID, err = GetIDFromType(m.Body)
 	if err != nil {
 		return err
@@ -83,8 +87,20 @@ func (e *Encoder) EncodeHeader(h *Header) ([]byte, error) {
 	if err = binary.Write(buf, binary.BigEndian, h.Type); err != nil {
 		return nil, err
 	}
-	if err = binary.Write(buf, binary.BigEndian, h.TransactionID); err != nil {
-		return nil, err
+	hasTransactionID := false
+	for _, b := range h.TransactionID {
+		if b != 0 {
+			hasTransactionID = true
+			break
+		}
+	}
+	if hasTransactionID {
+		h.Flags |= FTransactionID
+	}
+	if (h.Flags & FTransactionID) != 0 {
+		if err = binary.Write(buf, binary.BigEndian, h.TransactionID); err != nil {
+			return nil, err
+		}
 	}
 	if err = binary.Write(buf, binary.BigEndian, h.Length); err != nil {
 		return nil, err
@@ -106,6 +122,9 @@ func (e *Encoder) EncodeBody(v interface{}) (int, []byte, error) {
 
 func (e *Encoder) encodeValue(value reflect.Value) error {
 	kind := value.Kind()
+	if kind == reflect.Invalid {
+		return nil
+	}
 	if encoder, ok := e.primitiveEncoders[kind]; ok {
 		return encoder(e, value.Interface())
 	}

@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	typeRegistry           = make(map[reflect.Type]TypeID)
-	reverseRegistry        = make(map[TypeID]reflect.Type)
-	nextID          TypeID = 1
+	typeRegistry           = make(map[reflect.Type]TypeID, 32)
+	reverseRegistry        = make(map[TypeID]reflect.Type, 32)
+	nextID          TypeID = 0
 )
 
 func RegisterType(value interface{}) TypeID {
@@ -18,7 +18,7 @@ func RegisterType(value interface{}) TypeID {
 		reverseRegistry[nextID] = t
 		nextID++
 	}
-	if t.Kind() == reflect.Struct {
+	if t != nil && t.Kind() == reflect.Struct {
 		slice := reflect.New(reflect.SliceOf(t)).Elem().Interface()
 		RegisterType(slice)
 	}
@@ -50,6 +50,7 @@ func GetTypeFromID(id TypeID) (reflect.Type, error) {
 }
 
 func init() {
+	RegisterType(nil)
 	RegisterType(0)
 	RegisterType(int8(0))
 	RegisterType(int16(0))

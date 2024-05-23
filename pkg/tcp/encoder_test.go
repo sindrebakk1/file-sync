@@ -19,7 +19,7 @@ func TestEncodeHeader(t *testing.T) {
 
 	header := tcp.Header{
 		Version:       tcp.V1,
-		Flags:         tcp.FError | tcp.FHuff,
+		Flags:         tcp.FError | tcp.FHuff | tcp.FTransactionID,
 		Type:          1,
 		TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 		Length:        5,
@@ -147,7 +147,7 @@ func TestEncodeMessage_String(t *testing.T) {
 	client, server := net.Pipe()
 	message := &tcp.Message{
 		Header: tcp.Header{
-			Flags:         tcp.FError | tcp.FHuff,
+			Flags:         tcp.FTransactionID,
 			TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 		},
 		Body: "Hello",

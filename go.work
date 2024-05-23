@@ -3,7 +3,6 @@ go 1.22.1
 use (
 	cmd/client
 	cmd/server
-	pkg/constants
 	pkg/enums
 	pkg/integration
 	pkg/models

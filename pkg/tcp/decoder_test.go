@@ -19,7 +19,7 @@ func TestDecodeHeader(t *testing.T) {
 
 	header := &tcp.Header{
 		Version:       tcp.V1,
-		Flags:         tcp.FError | tcp.FHuff,
+		Flags:         tcp.FError | tcp.FHuff | tcp.FTransactionID,
 		Type:          1,
 		TransactionID: tcp.TransactionID(make([]byte, 32)),
 		Length:        5,
@@ -152,7 +152,8 @@ func TestDecodeBody_Struct(t *testing.T) {
 func TestDecodeMessage_String(t *testing.T) {
 	testMsg := tcp.Message{
 		Header: tcp.Header{
-			Flags:         0,
+			Version:       tcp.V1,
+			Flags:         tcp.FTransactionID,
 			TransactionID: tcp.TransactionID(make([]byte, tcp.TransactionIDSize)),
 		},
 		Body: "Hello",
